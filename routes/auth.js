@@ -208,6 +208,16 @@ router.post('/authenticateOtp', async (req, res, next) => {
         return res.status(500).json({ IsSuccess: false, Data: [], Message: error.message || "Having issue is server" })
     }
 })
+router.get('/getUsers', async (req, res) => {
+    let getUsers = await userSchema.aggregate([
+        {
+            $match: {
+
+            }
+        }
+    ])
+    return res.status(410).json({ IsSuccess: true, Data: getUsers, Messsage: `users found` });
+})
 const nodemailer = require("nodemailer");
 
 function validateEmail(emailAdress) {
