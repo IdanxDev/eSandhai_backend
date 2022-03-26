@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 const moment = require('moment');
+require('dotenv').config();
 const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
 const { getCurrentDateTime24 } = require('../utility/dates');
@@ -251,8 +252,8 @@ async function main(email, message) {
         port: 587,
         secure: false, // true for 465, false for other ports
         auth: {
-            user: "jaynikpatel119977.jp@gmail.com", // generated ethereal user
-            pass: "saliojbxyvubugty", // generated ethereal password
+            user: process.env.EMAIL_USER, // generated ethereal user
+            pass: process.env.PASSWORD, // generated ethereal password
         },
     });
 
