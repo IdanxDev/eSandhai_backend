@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 const moment = require('moment');
+const momentTz = require('moment-timezone')
 require('dotenv').config();
 const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
@@ -336,10 +337,13 @@ router.post('/authenticateOtpLogin', async (req, res, next) => {
         if (checkUser[0].isVerified) {
             return res.status(409).json({ issuccess: true, data: { acknowledgement: false, status: 4 }, message: `User already verified` });
         }
-        const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
-        const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
-        const timeIs = moment();
+
+        const startIs = momentTz(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').tz('Asia/Kolkata');
+        const endIs = momentTz(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').tz('Asia/Kolkata').add(1, 'minutes');
+        const timeIs = momentTz().tz('Asia/Kolkata');
         console.log(startIs)
+        console.log(endIs);
+        console.log(timeIs);
         if (timeIs >= startIs && timeIs <= endIs) {
             //otp valid
             if (checkUser[0].otp == otp) {
@@ -394,9 +398,13 @@ router.post('/authenticateOtp', async (req, res, next) => {
         if (checkUser.length == 0) {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, messsage: `No User Found With ${userId}` });
         }
-        const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
-        const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
-        const timeIs = moment();
+
+        const startIs = momentTz(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').tz('Asia/Kolkata');
+        const endIs = momentTz(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').tz('Asia/Kolkata').add(1, 'minutes');
+        const timeIs = momentTz().tz('Asia/Kolkata');
+        // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
+        // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
+        // const timeIs = moment();
         console.log(startIs)
         if (timeIs >= startIs && timeIs <= endIs) {
             //otp valid
