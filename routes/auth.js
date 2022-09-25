@@ -278,15 +278,14 @@ router.post('/updateUser', authenticateToken, async (req, res, next) => {
 
 router.post('/resendOtp', async (req, res, next) => {
     try {
-        const { id, oldOtp } = req.body;
+        const { id } = req.body;
 
         console.log(id);
         let checkOtp = await userSchema.aggregate([
             {
                 $match: {
                     $and: [
-                        { $or: [{ email: id }, { mobileNo: id }] },
-                        { otp: oldOtp }
+                        { $or: [{ email: id }, { mobileNo: id }] }
                     ]
                 }
             }
