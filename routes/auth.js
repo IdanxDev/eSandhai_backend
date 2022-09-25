@@ -378,6 +378,7 @@ router.post('/authenticateOtpLogin', async (req, res, next) => {
         }
 
     } catch (error) {
+        console.log(error.message);
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
