@@ -1,6 +1,14 @@
 const moment = require('moment-timezone')
 const momentIs = require('moment')
-function getCurrentDateTime(timeZone) {
+exports.validateEmail = (emailAdress) => {
+    let regexEmail = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    return regexEmail.test(emailAdress.match(regexEmail))
+}
+exports.validatePhoneNumber = (input_str) => {
+    var re = /^\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})$/;
+    return re.test(input_str);
+}
+exports.getCurrentDateTime = (timeZone) => {
     let date = moment()
         .tz(timeZone)
         .format("DD/MM/YYYY,h:mm:ss a")
@@ -13,7 +21,7 @@ function getCurrentDateTime(timeZone) {
 
     return [date, time];
 }
-function getCurrentDateTime24(timeZone) {
+exports.getCurrentDateTime24 = (timeZone) => {
     let date = moment()
         .tz(timeZone)
         .format("DD/MM/YYYY,H:mm:ss a")
@@ -26,7 +34,7 @@ function getCurrentDateTime24(timeZone) {
 
     return [date, time];
 }
-async function convertTime12to24(time12h) {
+exports.convertTime12to24 = (time12h) => {
     const [time, modifier] = time12h.split(" ");
 
     let [hours, minutes, second] = time.split(":");
@@ -42,7 +50,7 @@ async function convertTime12to24(time12h) {
     return `${hours}:${minutes}:${second}`;
 }
 
-function add15Minutes(time) {
+exports.add15Minutes = (time) => {
     console.log("time is" + time)
     let [hours, minutes, second] = time.split(":");
 
@@ -74,7 +82,7 @@ function add15Minutes(time) {
     }
     return `${hours}:${minutes}:${second}`;
 }
-function sub15Minutes(time) {
+exports.sub15Minutes = (time) => {
     console.log("time is" + time)
     let [hours, minutes, second] = time.split(":");
 
@@ -106,12 +114,12 @@ function sub15Minutes(time) {
     }
     return `${hours}:${minutes}:${second}`;
 }
-function convertDateFormat(date) {
+exports.convertDateFormat = (date) => {
     date = date.split("/");
     return `${date[2]}/${date[1]}/${date[0]}`;
 }
 
-function addTime(dateMoment, modifyMoment) {
+exports.addTime = (dateMoment, modifyMoment) => {
     // console.log(dateMoment)
     // console.log(modifyMoment)
     timeIs = modifyMoment.split(":");
@@ -125,4 +133,3 @@ function addTime(dateMoment, modifyMoment) {
 
     return secondUpdated;
 }
-module.exports = { getCurrentDateTime: getCurrentDateTime, addTime: addTime, getCurrentDateTime24: getCurrentDateTime24, convertDateFormat: convertDateFormat, convertTime12to24: convertTime12to24, add15Minutes: add15Minutes, sub15Minutes: sub15Minutes }

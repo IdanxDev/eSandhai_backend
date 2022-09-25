@@ -18,12 +18,18 @@ const userSchema = mongoose.Schema({
     password: {
         type: String
     },
-    isVerified: {
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
+    isMobileVerified: {
         type: Boolean,
         default: false
     },
     otp: String,
-    generatedTime: [String]
+    generatedTime: [String],
+    countryCode: String,
+    birthDate: String
 }, { timestamps: true });
 
 // userLogin.pre('save', async function (next) {
