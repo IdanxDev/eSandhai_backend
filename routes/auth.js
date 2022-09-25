@@ -338,8 +338,8 @@ router.post('/authenticateOtpLogin', async (req, res, next) => {
             return res.status(409).json({ issuccess: true, data: { acknowledgement: false, status: 4 }, message: `User already verified` });
         }
 
-        const startIs = (momentTz(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').tz('Asia/Kolkata'));
-        const endIs = (momentTz(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').tz('Asia/Kolkata').add(1, 'minutes'));
+        const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes')).tz('Asia/Kolkata'));
         const timeIs = (momentTz().tz('Asia/Kolkata'));
         // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
         // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
@@ -402,8 +402,8 @@ router.post('/authenticateOtp', async (req, res, next) => {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, messsage: `No User Found With ${userId}` });
         }
 
-        const startIs = (momentTz(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').tz('Asia/Kolkata'));
-        const endIs = (momentTz(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').tz('Asia/Kolkata').add(1, 'minutes'));
+        const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes')).tz('Asia/Kolkata'));
         const timeIs = (momentTz().tz('Asia/Kolkata'));
         // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
         // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
