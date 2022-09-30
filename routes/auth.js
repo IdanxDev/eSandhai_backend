@@ -8,7 +8,8 @@ const userSchema = require('../models/userModel');
 const { getCurrentDateTime24 } = require('../utility/dates');
 const nodemailer = require("nodemailer");
 const { sendSms } = require('../utility/sendSms');
-const { generateAccessToken, authenticateToken } = require('../middleware/auth');
+const { generateAccessToken, authenticateToken, generateRefreshToken } = require('../middleware/auth');
+const addressSchema = require('../models/addressSchema');
 
 /* GET home page. */
 router.get('/', async function (req, res, next) {
@@ -276,7 +277,36 @@ router.post('/updateUser', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getProfile', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        console.log(req.user._id);
+        const checkUser = await userSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $project: {
+                    "generatedTime": 0,
+                    "createdAt": 0,
+                    "updatedAt": 0,
+                    "__v": 0,
+                    "otp": 0,
+                    password: 0
+                }
+            }
+        ]);
+        if (checkUser.length == 0) {
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "no user details found" });
 
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser[0] }, message: "user details found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.post('/resendOtp', async (req, res, next) => {
     try {
         const { id } = req.body;
@@ -315,6 +345,94 @@ router.post('/resendOtp', async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/addAddress', async (req, res, next) => {
+    try {
+        const { addressType, lat, long, isDefault, street, houseNo, pincode, landmark, city, state } = req.body;
+
+        const userId = req.user._id
+        if (isDefault) {
+            let update = addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
+        }
+        let createAddress = new addressSchema({
+            addressType: addressType,
+            isDefault: isDefault,
+            pincode: pincode,
+            houseNo: houseNo,
+            street: street,
+            landmark: landmark,
+            city: city,
+            state: state,
+            userId: userId,
+            location: [lat, long]
+        })
+
+        await createAddress.save();
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { addressId: createAddress._id } }, message: "Address Details saved" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/updateAddress', async (req, res, next) => {
+    try {
+        const { addressType, lat, long, isDefault, street, houseNo, pincode, landmark, city, state, addressId } = req.body;
+
+        const userId = req.user._id
+
+        let checkAddress = await addressSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(addressId)
+                }
+            }
+        ]);
+        if (checkAddress.length == 0) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "address not found" });
+        }
+        if (isDefault) {
+            let update = addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
+        }
+        let createAddress = {
+            addressType: addressType != undefined ? addressType : checkAddress[0].addressType,
+            isDefault: isDefault != undefined ? isDefault : checkAddress[0].isDefault,
+            pincode: pincode != undefined ? pincode : checkAddress[0].pincode,
+            houseNo: houseNo != undefined ? houseNo : checkAddress[0].houseNo,
+            street: street != undefined ? street : checkAddress[0].street,
+            landmark: landmark != undefined ? landmark : checkAddress[0].landmark,
+            city: city != undefined ? city : checkAddress[0].city,
+            state: state != undefined ? state : checkAddress[0].state,
+            userId: userId,
+            location: lat != undefined && long != undefined ? [lat, long] : checkAddress[0].location
+        }
+
+        let updateAdd = await addressSchema.findByIdAndUpdate(addressId, createAddress, { new: true });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { addressId: updateAdd._id } }, message: "Address Details updated" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/address', async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        let getAddress = await addressSchema.aggregate([
+            {
+                $match: {
+                    userId: mongoose.Types.ObjectId(userId)
+                }
+            }
+        ]);
+
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+
 //authenticate otp and update for verified status
 router.post('/authenticateOtpLogin', async (req, res, next) => {
     try {
@@ -442,6 +560,9 @@ router.get('/getUsers', async (req, res) => {
     ])
     return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, messsage: getUsers.length > 0 ? `users found` : "no user found" });
 })
+
+router.get('/refresh', generateRefreshToken);
+
 function validateEmail(emailAdress) {
     let regexEmail = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (emailAdress.match(regexEmail)) {

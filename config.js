@@ -1,6 +1,6 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-console.log(process.env.HOST);
+// console.log(process.env.HOST);
 /*Database Connection*/
 mongoose.connect(process.env.HOST, {
     useNewUrlParser: true,
