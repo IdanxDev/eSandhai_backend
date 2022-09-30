@@ -192,7 +192,7 @@ router.post('/login', async (req, res, next) => {
             checkExist = await userSchema.aggregate([
                 {
                     $match: {
-                        email: id
+                        mobileNo: id
                     }
                 }
             ]);
@@ -201,7 +201,7 @@ router.post('/login', async (req, res, next) => {
 
         if (checkExist.length > 0) {
             if (checkExist[0].password != password) {
-                return res.status(401).json({ issuccess: true, data: { acknowledgement: false }, message: "Incorrect Password" });
+                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
             }
             // let user = {
             //     _id: checkExist[0]._id,
@@ -220,7 +220,7 @@ router.post('/login', async (req, res, next) => {
             await main(checkExist[0].email, message);
             return
         }
-        return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "user not found" });
+        return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null, status: 0 }, message: "incorrect email id or mobile no" });
     } catch (error) {
         console.log(error.message);
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: error.message || "Having issue is server" })
