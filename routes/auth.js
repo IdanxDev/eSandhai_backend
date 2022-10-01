@@ -179,24 +179,17 @@ router.post('/login', async (req, res, next) => {
             return res.status(400).json({ issuccess: true, data: { acknowledgement: false }, message: "please use correct mobile no or email" });
         }
 
-        if (isEmail) {
-            checkExist = await userSchema.aggregate([
-                {
-                    $match: {
-                        email: id
-                    }
+        checkExist = await userSchema.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { email: id },
+                        { mobileNo: id }
+                    ]
                 }
-            ]);
-        }
-        else {
-            checkExist = await userSchema.aggregate([
-                {
-                    $match: {
-                        mobileNo: id
-                    }
-                }
-            ]);
-        }
+            }
+        ]);
+
 
 
         if (checkExist.length > 0) {
@@ -322,7 +315,7 @@ router.post('/resendOtp', async (req, res, next) => {
             }
         ])
         if (checkOtp.length == 0) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: false }, messsage: "having issue with otp" });
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: false }, messsage: "no user found with this ids" });
         }
 
         otp = getRandomIntInclusive(111111, 999999);
@@ -457,7 +450,7 @@ router.post('/authenticateOtpLogin', async (req, res, next) => {
         }
 
         const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
-        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(2, 'minutes')).tz('Asia/Kolkata'));
         const timeIs = (momentTz().tz('Asia/Kolkata'));
         // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
         // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
@@ -522,7 +515,7 @@ router.post('/authenticateOtp', async (req, res, next) => {
         }
 
         const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
-        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(2, 'minutes')).tz('Asia/Kolkata'));
         const timeIs = (momentTz().tz('Asia/Kolkata'));
         // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
         // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
@@ -549,7 +542,52 @@ router.post('/authenticateOtp', async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/setPassword', async (req, res, next) => {
+    try {
+        const { otp, id, password } = req.body;
 
+        let checkUser = await userSchema.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { email: id },
+                        { mobileNo: id }
+                    ]
+                }
+            }
+        ]);
+
+        if (checkUser.length == 0) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, messsage: `No User Found With ${userId}` });
+        }
+
+        const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(2, 'minutes')).tz('Asia/Kolkata'));
+        const timeIs = (momentTz().tz('Asia/Kolkata'));
+        // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
+        // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
+        // const timeIs = moment();
+        console.log(startIs)
+        if (timeIs >= startIs && timeIs <= endIs) {
+            //otp valid
+            if (checkUser[0].otp == otp) {
+                let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, messsage: `password changed sucessfully` });
+            }
+            else {
+                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, messsage: `incorrect otp` });
+            }
+            console.log("valid")
+        }
+        else {
+            //otp expired
+            return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, messsage: `otp expired` });
+        }
+
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getUsers', async (req, res) => {
     let getUsers = await userSchema.aggregate([
         {
