@@ -167,7 +167,7 @@ router.post('/login-mobile', [body('mobileNo').isEmail().withMessage("please pas
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/login', [body('email').isEmail().withMessage("please pass email id"), body('password').isString().withMessage("please pass password")], checkErr, async (req, res, next) => {
+router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass email id"), body('id').isMobilePhone().withMessage("please pass mobile no")], "please pass valid email or mobile no"), body('password').isString().withMessage("please pass password")], checkErr, async (req, res, next) => {
     try {
         const { password, id } = req.body;
 
