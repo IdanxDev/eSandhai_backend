@@ -7,10 +7,12 @@ const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
 const { getCurrentDateTime24 } = require('../utility/dates');
 const nodemailer = require("nodemailer");
+const { check, body, oneOf } = require('express-validator')
 const { sendSms } = require('../utility/sendSms');
+const { getPlaces, placeFilter, formatAddress } = require('../utility/mapbox')
 const { generateAccessToken, authenticateToken, generateRefreshToken } = require('../middleware/auth');
 const addressSchema = require('../models/addressSchema');
-
+const { checkErr } = require('../utility/error');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -68,7 +70,7 @@ router.post('/signUp-Old', async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/signUp', async (req, res, next) => {
+router.post('/signUp', [body('email').isEmail().withMessage("please pass email id"), body('password').isString().withMessage("please pass password")], checkErr, async (req, res, next) => {
     try {
         const { email, password } = req.body;
 
@@ -111,7 +113,7 @@ router.post('/signUp', async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/login-mobile', async (req, res, next) => {
+router.post('/login-mobile', [body('mobileNo').isEmail().withMessage("please pass mobile no"), body('countryCode').isString().withMessage("please pass countrycode")], checkErr, async (req, res, next) => {
     try {
         const { mobileNo, countryCode } = req.body;
 
@@ -164,7 +166,7 @@ router.post('/login-mobile', async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/login', async (req, res, next) => {
+router.post('/login', [body('email').isEmail().withMessage("please pass email id"), body('password').isString().withMessage("please pass password")], checkErr, async (req, res, next) => {
     try {
         const { password, id } = req.body;
 
@@ -300,10 +302,9 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/resendOtp', async (req, res, next) => {
+router.post('/resendOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no")], checkErr, async (req, res, next) => {
     try {
         const { id } = req.body;
-
         console.log(id);
         let checkOtp = await userSchema.aggregate([
             {
@@ -338,96 +339,8 @@ router.post('/resendOtp', async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addAddress', async (req, res, next) => {
-    try {
-        const { addressType, lat, long, isDefault, street, houseNo, pincode, landmark, city, state } = req.body;
-
-        const userId = req.user._id
-        if (isDefault) {
-            let update = addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
-        }
-        let createAddress = new addressSchema({
-            addressType: addressType,
-            isDefault: isDefault,
-            pincode: pincode,
-            houseNo: houseNo,
-            street: street,
-            landmark: landmark,
-            city: city,
-            state: state,
-            userId: userId,
-            location: [lat, long]
-        })
-
-        await createAddress.save();
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { addressId: createAddress._id } }, message: "Address Details saved" });
-
-    } catch (error) {
-        console.log(error.message);
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
-router.post('/updateAddress', async (req, res, next) => {
-    try {
-        const { addressType, lat, long, isDefault, street, houseNo, pincode, landmark, city, state, addressId } = req.body;
-
-        const userId = req.user._id
-
-        let checkAddress = await addressSchema.aggregate([
-            {
-                $match: {
-                    _id: mongoose.Types.ObjectId(addressId)
-                }
-            }
-        ]);
-        if (checkAddress.length == 0) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "address not found" });
-        }
-        if (isDefault) {
-            let update = addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
-        }
-        let createAddress = {
-            addressType: addressType != undefined ? addressType : checkAddress[0].addressType,
-            isDefault: isDefault != undefined ? isDefault : checkAddress[0].isDefault,
-            pincode: pincode != undefined ? pincode : checkAddress[0].pincode,
-            houseNo: houseNo != undefined ? houseNo : checkAddress[0].houseNo,
-            street: street != undefined ? street : checkAddress[0].street,
-            landmark: landmark != undefined ? landmark : checkAddress[0].landmark,
-            city: city != undefined ? city : checkAddress[0].city,
-            state: state != undefined ? state : checkAddress[0].state,
-            userId: userId,
-            location: lat != undefined && long != undefined ? [lat, long] : checkAddress[0].location
-        }
-
-        let updateAdd = await addressSchema.findByIdAndUpdate(addressId, createAddress, { new: true });
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { addressId: updateAdd._id } }, message: "Address Details updated" });
-
-    } catch (error) {
-        console.log(error.message);
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
-router.get('/address', async (req, res, next) => {
-    try {
-        const userId = req.user._id
-        let getAddress = await addressSchema.aggregate([
-            {
-                $match: {
-                    userId: mongoose.Types.ObjectId(userId)
-                }
-            }
-        ]);
-
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
-
-    } catch (error) {
-        console.log(error.message);
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
-
 //authenticate otp and update for verified status
-router.post('/authenticateOtpLogin', async (req, res, next) => {
+router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"), body('otp').isNumeric().withMessage("please pass otp")], checkErr, async (req, res, next) => {
     try {
         const { otp, id } = req.body;
 
@@ -475,7 +388,7 @@ router.post('/authenticateOtpLogin', async (req, res, next) => {
                 console.log(checkUser[0].otp);
                 let update = await userSchema.findByIdAndUpdate(checkUser[0]._id, updateData, { new: true });
                 const {
-                    generatedToken, refreshToken } = await generateAccessToken({ _id: checkUser[0]._id })
+                    generatedToken, refreshToken } = await generateAccessToken({ _id: checkUser[0]._id, role: checkUser[0].role })
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0, generatedToken: generatedToken, refreshToken: refreshToken }, message: `otp verifed successfully` });
             }
             else {
@@ -495,7 +408,7 @@ router.post('/authenticateOtpLogin', async (req, res, next) => {
 })
 
 //return response for otp verification only
-router.post('/authenticateOtp', async (req, res, next) => {
+router.post('/authenticateOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"), body('otp').isNumeric().withMessage("please pass otp")], checkErr, async (req, res, next) => {
     try {
         const { otp, id } = req.body;
 
@@ -525,7 +438,7 @@ router.post('/authenticateOtp', async (req, res, next) => {
             //otp valid
             if (checkUser[0].otp == otp) {
                 const {
-                    generatedToken, refreshToken } = await generateAccessToken({ _id: checkUser[0]._id })
+                    generatedToken, refreshToken } = await generateAccessToken({ _id: checkUser[0]._id, role: checkUser[0].role })
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0, generatedToken: generatedToken, refreshToken: refreshToken }, messsage: `otp verifed successfully` });
             }
             else {
@@ -542,7 +455,7 @@ router.post('/authenticateOtp', async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/setPassword', async (req, res, next) => {
+router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"), body('otp').isNumeric().withMessage("please pass otp"), body('password').isString().withMessage("please pass password")], checkErr, async (req, res, next) => {
     try {
         const { otp, id, password } = req.body;
 
@@ -601,6 +514,138 @@ router.get('/getUsers', async (req, res) => {
 
 router.get('/refresh', generateRefreshToken);
 
+router.get('/getSuggestions', async (req, res, next) => {
+    try {
+        // const userId = req.user._id
+        const { text } = req.body;
+        // console.log(req.user._id);
+        let places = await getPlaces(text);
+        let filterPlace = await placeFilter(places)
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: filterPlace.length > 0 ? filterPlace : [] }, message: filterPlace.length > 0 ? "places details found" : "no any place found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getPlace', async (req, res, next) => {
+    try {
+        // const userId = req.user._id
+        const { lat, long } = req.body;
+        // console.log(req.user._id);
+        let places = await getPlaces(`${long},${lat}`, 1);
+        // return res.json(places)
+        let filterPlace = await formatAddress(places)
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: Object.keys(filterPlace).length > 0 ? true : false, data: Object.keys(filterPlace).length > 0 ? filterPlace : filterPlace }, message: Object.keys(filterPlace).length > 0 ? "address found" : "address not recognized" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/addAddress', authenticateToken, async (req, res, next) => {
+    try {
+        const { addressType, lat, long, placeAddress, placeName, isDefault, street, houseNo, pincode, landmark, locality, city, district, region, country } = req.body;
+        const userId = req.user._id
+        if (isDefault) {
+            let update = addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
+        }
+        let createAddress = new addressSchema({
+            addressType: addressType,
+            isDefault: isDefault,
+            placeName: placeName,
+            placeAddress: placeAddress,
+            pincode: pincode,
+            houseNo: houseNo,
+            street: street,
+            landmark: landmark,
+            locality: locality,
+            city: city,
+            district: district,
+            region: region,
+            country: country,
+            userId: userId,
+            lat: lat,
+            long: long
+        })
+
+        await createAddress.save();
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { addressId: createAddress._id } }, message: "Address Details saved" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateAddress', authenticateToken, async (req, res, next) => {
+    try {
+        const { addressType, lat, long, addressId, placeAddress, placeName, isDefault, street, houseNo, pincode, landmark, locality, city, district, region, country } = req.body;
+        const userId = req.user._id
+        let checkAddress = await addressSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(addressId)
+                }
+            }
+        ]);
+        if (checkAddress.length == 0) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "address not found" });
+        }
+        if (isDefault) {
+            let update = addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
+        }
+        let createAddress = {
+            addressType: addressType == undefined ? checkAddress[0].addressType : addressType,
+            isDefault: isDefault == undefined ? checkAddress[0].isDefault : isDefault,
+            placeName: placeName == undefined ? checkAddress[0].placeName : placeName,
+            placeAddress: placeAddress == undefined ? checkAddress[0].placeAddress : placeAddress,
+            pincode: pincode == undefined ? checkAddress[0].pincode : pincode,
+            houseNo: houseNo == undefined ? checkAddress[0].houseNo : houseNo,
+            street: street == undefined ? checkAddress[0].street : street,
+            landmark: landmark == undefined ? checkAddress[0].landmark : landmark,
+            locality: locality == undefined ? checkAddress[0].locality : locality,
+            city: city == undefined ? checkAddress[0].city : city,
+            district: district == undefined ? checkAddress[0].district : district,
+            region: region == undefined ? checkAddress[0].region : region,
+            country: country == undefined ? checkAddress[0].country : country,
+            lat: lat == undefined ? checkAddress[0].lat : lat,
+            long: long == undefined ? checkAddress[0].long : long
+        }
+        let updateAdd = await addressSchema.findByIdAndUpdate(addressId, createAddress, { new: true });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { addressId: updateAdd._id } }, message: "Address details updated" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/address', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        let getAddress = await addressSchema.aggregate([
+            {
+                $match: {
+                    userId: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ]);
+
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+
+
 function validateEmail(emailAdress) {
     let regexEmail = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (emailAdress.match(regexEmail)) {
@@ -620,38 +665,6 @@ function getRandomIntInclusive(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min); //The maximum is inclusive and the minimum is inclusive
 }
 // async..await is not allowed in global scope, must use a wrapper
-async function main(email, message) {
-    console.log("execute0")
-    // Generate test SMTP service account from ethereal.email
-    // Only needed if you don't have a real mail account for testing
-    let testAccount = await nodemailer.createTestAccount();
 
-    // create reusable transporter object using the default SMTP transport
-    let transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false, // true for 465, false for other ports
-        auth: {
-            user: process.env.EMAIL_USER, // generated ethereal user
-            pass: process.env.PASSWORD, // generated ethereal password
-        },
-    });
-
-    // send mail with defined transport object
-    let info = await transporter.sendMail({
-        from: 'itsme@gmail.com', // sender address
-        to: email, // list of receivers
-        subject: "Hello ✔", // Subject line
-        text: "Hello world?", // plain text body
-        html: message, // html body
-    });
-
-    console.log("Message sent: %s", info.messageId);
-    // Message sent: <b658f8ca-6296-ccf4-8306-87d57a0b4321@example.com>
-
-    // Preview only available when sending through an Ethereal account
-    console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-    // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
-}
 
 module.exports = router;

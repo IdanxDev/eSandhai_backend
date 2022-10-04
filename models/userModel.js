@@ -2,13 +2,16 @@ const mongoose = require('mongoose');
 // const bcrypt = require('bcrypt');
 const userSchema = mongoose.Schema({
     name: {
-        type: String
+        type: String,
+        default: ""
     },
     mobileNo: {
-        type: String
+        type: String,
+        default: ""
     },
     email: {
-        type: String
+        type: String,
+        default: ""
     },
     role: {
         type: String,
@@ -29,7 +32,11 @@ const userSchema = mongoose.Schema({
     otp: String,
     generatedTime: [String],
     countryCode: String,
-    birthDate: String
+    birthDate: String,
+    status: {
+        type: Number,
+        default: 0
+    }
 }, { timestamps: true });
 
 // userLogin.pre('save', async function (next) {

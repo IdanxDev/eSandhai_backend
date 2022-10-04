@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-// const bcrypt = require('bcrypt');
+const bcrypt = require('bcrypt');
 const adminSchema = mongoose.Schema({
     name: {
         type: String
@@ -12,8 +12,8 @@ const adminSchema = mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ["admin", "manager", "clark"],
-        default: "clark"
+        enum: ["superAdmin", "admin", "employee"],
+        default: "employee"
     },
     password: {
         type: String
@@ -29,10 +29,14 @@ const adminSchema = mongoose.Schema({
     otp: String,
     generatedTime: [String],
     countryCode: String,
-    birthDate: String
+    birthDate: String,
+    status: {
+        type: Number,
+        default: 0
+    }
 }, { timestamps: true });
 
-userLogin.pre('save', async function (next) {
+adminSchema.pre('save', async function (next) {
     try {
         const salt = await bcrypt.genSalt(10);
         const hashedpassword = await bcrypt.hash(this.password, salt);

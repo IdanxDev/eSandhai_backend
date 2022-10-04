@@ -18,12 +18,29 @@ const addressSchema = mongoose.Schema({
     street: {
         type: String
     },
+    placeName: {
+        type: String
+    },
+    placeAddress: {
+        type: String
+    },
+    district: {
+        type: String
+    },
+    locality: {
+        type: String
+    },
     landmark: {
         type: String
     },
-    location: [Number],
+    mobileNo: {
+        type: String
+    },
+    lat: Number,
+    long: Number,
     city: String,
-    state: String,
+    region: String,
+    country: String,
     userId: {
         type: mongoose.Types.ObjectId,
         ref: "users"

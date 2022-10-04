@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 // const client = require('../services/redis')
 
 //this function used for generate accesss token from refresh token
-function generateRefreshToken(req, res, next) {
+exports.generateRefreshToken = (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
         const refreshToken = authHeader && authHeader.split(' ')[1]
@@ -21,6 +21,7 @@ function generateRefreshToken(req, res, next) {
             // }
             const accessToken = await generateAccessTokenOnly({
                 _id: user._id,
+                role: user.role,
                 // deviceId: user.deviceId,
                 timestamp: Date.now()
             })
@@ -35,9 +36,16 @@ function generateRefreshToken(req, res, next) {
     }
 
 }
-
+exports.checkUserRole = (roles) => {
+    return async function (req, res, next) {
+        if (!roles.includes(req.user.role)) {
+            return res.status(401).json({ issuccess: false, data: { acknowledgement: false }, message: "you does not have permission to access this data" })
+        }
+        next();
+    }
+}
 //authenticate access token
-async function authenticateToken(req, res, next) {
+exports.authenticateToken = async (req, res, next) => {
     // console.log(req.headers)
     const authHeader = req.headers['authorization']
     // console.log(authHeader)
@@ -51,6 +59,7 @@ async function authenticateToken(req, res, next) {
         // console.log(user);
         req.user = {
             _id: user._id,
+            role: user.role
             // deviceId: user.deviceId
         }
         // let getData = await client.get(user._id + "" + user.deviceId);
@@ -64,7 +73,7 @@ async function authenticateToken(req, res, next) {
     })
 }
 //authenticate access token
-async function authenticateTokenWithUserId(req, res, next) {
+exports.authenticateTokenWithUserId = async (req, res, next) => {
     // console.log(req.headers)
     if (req.body.hasOwnProperty('userId')) {
         next();
@@ -86,7 +95,7 @@ async function authenticateTokenWithUserId(req, res, next) {
     })
 }
 
-function parseJwt(token) {
+exports.parseJwt = (token) => {
     var base64Url = token.split('.')[1];
     var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     var jsonPayload = decodeURIComponent(Buffer.from(base64, 'base64').toString().split('').map(function (c) {
@@ -97,11 +106,11 @@ function parseJwt(token) {
 };
 
 //generate access token and refesh token for user
-async function generateAccessToken(user) {
+exports.generateAccessToken = async (user) => {
     console.log("user token");
     console.log(user);
-    const generatedToken = jwt.sign({ _id: user._id, time: Date.now() }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10d' })
-    const refreshToken = jwt.sign({ _id: user._id, time: Date.now() }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '10d' })
+    const generatedToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10d' })
+    const refreshToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '10d' })
     // console.log(generatedToken);
     // await client.set(user._id + "" + user.deviceId, refreshToken);
     return {
@@ -110,14 +119,9 @@ async function generateAccessToken(user) {
 }
 
 //generate access token only using refreshtoken
-async function generateAccessTokenOnly(user) {
-    const generatedToken = jwt.sign({ _id: user._id, deviceId: user.deviceId, time: Date.now() }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10d' })
+exports.generateAccessTokenOnly = async (user) => {
+    const generatedToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10d' })
     return generatedToken;
 }
 
-module.exports = {
-    authenticateToken: authenticateToken,
-    generateAccessToken: generateAccessToken,
-    generateRefreshToken: generateRefreshToken,
-    authenticateTokenWithUserId: authenticateTokenWithUserId
-}
+
