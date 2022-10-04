@@ -8,6 +8,7 @@ const userSchema = require('../models/userModel');
 const { getCurrentDateTime24 } = require('../utility/dates');
 const nodemailer = require("nodemailer");
 const { check, body, oneOf } = require('express-validator')
+const { main } = require('../utility/mail')
 const { sendSms } = require('../utility/sendSms');
 const { getPlaces, placeFilter, formatAddress } = require('../utility/mapbox')
 const { generateAccessToken, authenticateToken, generateRefreshToken } = require('../middleware/auth');
