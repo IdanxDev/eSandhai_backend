@@ -157,11 +157,11 @@ router.post('/resendOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone
             }
         ])
         if (checkOtp.length == 0) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: false }, messsage: "no user found with this ids" });
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: false }, message: "no user found with this ids" });
         }
 
         otp = getRandomIntInclusive(111111, 999999);
-        res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: otp }, messsage: "Otp sent successfully" });
+        res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: otp }, message: "Otp sent successfully" });
 
         let update = await adminSchema.findByIdAndUpdate(checkOtp[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
         let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
@@ -197,7 +197,7 @@ router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').is
         ]);
 
         if (checkUser.length == 0) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, messsage: `No User Found With ${id}` });
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${id}` });
         }
         if (checkUser[0].isVerified) {
             return res.status(409).json({ issuccess: true, data: { acknowledgement: false, status: 4 }, message: `User already verified` });
@@ -233,7 +233,7 @@ router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').is
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0, generatedToken: generatedToken, refreshToken: refreshToken }, message: `otp verifed successfully` });
             }
             else {
-                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, messsage: `incorrect otp` });
+                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
             }
             console.log("valid")
         }
@@ -265,7 +265,7 @@ router.post('/authenticateOtp', [oneOf([body('id').isEmail(), body('id').isMobil
         ]);
 
         if (checkUser.length == 0) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, messsage: `No User Found With ${userId}` });
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${userId}` });
         }
 
         const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
@@ -280,16 +280,16 @@ router.post('/authenticateOtp', [oneOf([body('id').isEmail(), body('id').isMobil
             if (checkUser[0].otp == otp) {
                 const {
                     generatedToken, refreshToken } = await generateAccessToken({ _id: checkUser[0]._id, role: checkUser[0].role })
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0, generatedToken: generatedToken, refreshToken: refreshToken }, messsage: `otp verifed successfully` });
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0, generatedToken: generatedToken, refreshToken: refreshToken }, message: `otp verifed successfully` });
             }
             else {
-                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, messsage: `incorrect otp` });
+                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
             }
             console.log("valid")
         }
         else {
             //otp expired
-            return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, messsage: `otp expired` });
+            return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
         }
 
     } catch (error) {
@@ -312,7 +312,7 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         ]);
 
         if (checkUser.length == 0) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, messsage: `No User Found With ${userId}` });
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${userId}` });
         }
 
         const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
@@ -326,16 +326,16 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
             //otp valid
             if (checkUser[0].otp == otp) {
                 let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, messsage: `password changed sucessfully` });
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
             }
             else {
-                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, messsage: `incorrect otp` });
+                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
             }
             console.log("valid")
         }
         else {
             //otp expired
-            return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, messsage: `otp expired` });
+            return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
         }
 
     } catch (error) {
@@ -378,7 +378,7 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
             }
         }
     ])
-    return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, messsage: getUsers.length > 0 ? `users found` : "no user found" });
+    return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
 })
 router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     const { userId } = req.body;
@@ -416,7 +416,7 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
             }
         }
     ])
-    return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, messsage: getUsers.length > 0 ? `admin users found` : "no user found" });
+    return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
 })
 
 router.get('/refresh', generateRefreshToken);
