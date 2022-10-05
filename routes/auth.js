@@ -114,7 +114,7 @@ router.post('/signUp', [body('email').isEmail().withMessage("please pass email i
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/login-mobile', [body('mobileNo').isEmail().withMessage("please pass mobile no"), body('countryCode').isString().withMessage("please pass countrycode")], checkErr, async (req, res, next) => {
+router.post('/login-mobile', [body('mobileNo').isMobilePhone().withMessage("please pass mobile no"), body('countryCode').isString().withMessage("please pass countrycode")], checkErr, async (req, res, next) => {
     try {
         const { mobileNo, countryCode } = req.body;
 
@@ -190,6 +190,21 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
                         { mobileNo: id }
                     ]
                 }
+            },
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    otp: 0,
+                    _id: 0,
+                    generatedTime: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
             }
         ]);
 
@@ -199,6 +214,8 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
             if (checkExist[0].password != password) {
                 return res.status(401).json({ issuccess: true, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
             }
+
+            delete checkExist[0].password;
             // let user = {
             //     _id: checkExist[0]._id,
             //     timestamp: Date.now()
@@ -210,7 +227,7 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
             //
             // main().catch(console.error);
             otp = getRandomIntInclusive(111111, 999999);
-            res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist, otp: otp }, message: "user found" });
+            res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0], otp: otp }, message: "user found" });
             let update = await userSchema.findByIdAndUpdate(checkExist[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
             let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
             await main(checkExist[0].email, message);
