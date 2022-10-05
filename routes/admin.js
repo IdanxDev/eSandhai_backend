@@ -113,6 +113,7 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
             if (!(await bcrypt.compare(password, checkExist[0].password))) {
                 return res.status(401).json({ issuccess: true, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
             }
+            delete checkExist[0].password
             // let user = {
             //     _id: checkExist[0]._id,
             //     timestamp: Date.now()
@@ -203,7 +204,7 @@ router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').is
         }
 
         const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
-        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(2, 'minutes')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(5, 'minutes')).tz('Asia/Kolkata'));
         const timeIs = (momentTz().tz('Asia/Kolkata'));
         // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
         // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
@@ -222,7 +223,7 @@ router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').is
                 }
                 else if (validatePhoneNumber(id)) {
                     updateData = {
-                        isMobileVerified: false
+                        isMobileVerified: true
                     }
                 }
                 console.log(checkUser[0].otp);
@@ -268,7 +269,7 @@ router.post('/authenticateOtp', [oneOf([body('id').isEmail(), body('id').isMobil
         }
 
         const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
-        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(2, 'minutes')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(5, 'minutes')).tz('Asia/Kolkata'));
         const timeIs = (momentTz().tz('Asia/Kolkata'));
         // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
         // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
@@ -315,7 +316,7 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         }
 
         const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
-        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(2, 'minutes')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(5, 'minutes')).tz('Asia/Kolkata'));
         const timeIs = (momentTz().tz('Asia/Kolkata'));
         // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
         // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
