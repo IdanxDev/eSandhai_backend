@@ -387,7 +387,7 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
             }
         }
     ])
-    return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
+    return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
 })
 router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     const { userId } = req.body;
@@ -433,9 +433,13 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
             }
         }
     ])
-    return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
+    return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
 })
+router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    const { userId } = req.body;
 
+    return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
+})
 router.get('/refresh', generateRefreshToken);
 
 function validateEmail(emailAdress) {
