@@ -29,6 +29,7 @@ const userSchema = mongoose.Schema({
         type: Boolean,
         default: false
     },
+    currentPlan: String,
     otp: String,
     generatedTime: [String],
     countryCode: String,

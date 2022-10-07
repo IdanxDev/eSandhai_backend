@@ -16,7 +16,7 @@ const { generateAccessToken, authenticateToken, generateRefreshToken, checkUserR
 const addressSchema = require('../models/addressSchema');
 const { checkErr } = require('../utility/error');
 const regex = /^(1[0-2]|0[1-9])\/(3[01]|[12][0-9]|0[1-9])\/[0-9]{4}$/;
-router.post('/signUp', authenticateToken, [body('email').isEmail().withMessage("please pass email id"),
+router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
 body('role').isIn(["superAdmin", "admin", "employee"]).withMessage("please pass valid role"),
 body('gender').isIn(["Male", "Female", "Other"]).withMessage("please pass valid gender value"),
@@ -376,6 +376,15 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
                 createdAt: 0,
                 updatedAt: 0
             }
+        },
+        {
+            $addFields: {
+                currentPlan: { $ifNull: ["$currentPlan", "Unspecified"] },
+                country: "Usa",
+                mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+                email: { $ifNull: ["$email", "Unspecified"] },
+                status: { $ifNull: ["$status", 0] }
+            }
         }
     ])
     return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
@@ -413,6 +422,14 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
                 generatedTime: 0,
                 createdAt: 0,
                 updatedAt: 0
+            }
+        },
+        {
+            $addFields: {
+                country: "Usa",
+                mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+                email: { $ifNull: ["$email", "Unspecified"] },
+                status: { $ifNull: ["$status", 0] }
             }
         }
     ])
