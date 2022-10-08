@@ -377,7 +377,8 @@ router.get('/getAdminProfile', authenticateToken, checkUserRole(['superAdmin', '
                     country: "Usa",
                     mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
                     email: { $ifNull: ["$email", "Unspecified"] },
-                    status: { $ifNull: ["$status", 0] }
+                    status: { $ifNull: ["$status", 0] },
+                    name: { $ifNull: ["$name", ""] }
                 }
             }
         ]);
@@ -394,10 +395,23 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
     try {
         const { userId } = req.body;
         let match;
+        let anotherMatch = [];
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('role' in req.query) {
+            anotherMatch.push({ role: req.query.role })
+        }
         if (userId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(userId)
+            })
+        }
+        if (anotherMatch.length > 0) {
             match = {
                 $match: {
-                    _id: mongoose.Types.ObjectId(userId)
+                    $and: anotherMatch
                 }
             }
         }
@@ -432,7 +446,8 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
                     country: "Usa",
                     mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
                     email: { $ifNull: ["$email", "Unspecified"] },
-                    status: { $ifNull: ["$status", 0] }
+                    status: { $ifNull: ["$status", 0] },
+                    name: { $ifNull: ["$name", ""] }
                 }
             }
         ])
@@ -445,10 +460,23 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
     try {
         const { userId } = req.body;
         let match;
+        let anotherMatch = [];
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('role' in req.query) {
+            anotherMatch.push({ role: req.query.role })
+        }
         if (userId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(userId)
+            })
+        }
+        if (anotherMatch.length > 0) {
             match = {
                 $match: {
-                    _id: mongoose.Types.ObjectId(userId)
+                    $and: anotherMatch
                 }
             }
         }
