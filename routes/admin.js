@@ -346,6 +346,50 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getAdminProfile', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        console.log(req.user._id);
+        const checkUser = await adminSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    "generatedTime": 0,
+                    "createdAt": 0,
+                    "updatedAt": 0,
+                    "__v": 0,
+                    "otp": 0,
+                    password: 0,
+                    _id: 0
+                }
+            },
+            {
+                $addFields: {
+                    country: "Usa",
+                    mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+                    email: { $ifNull: ["$email", "Unspecified"] },
+                    status: { $ifNull: ["$status", 0] }
+                }
+            }
+        ]);
+        if (checkUser.length == 0) {
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "no user details found" });
+
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser[0] }, message: "user details found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     try {
         const { userId } = req.body;
