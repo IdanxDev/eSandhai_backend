@@ -200,7 +200,6 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
                 $project: {
                     __v: 0,
                     otp: 0,
-                    _id: 0,
                     generatedTime: 0,
                     createdAt: 0,
                     updatedAt: 0
@@ -227,8 +226,9 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
             //
             // main().catch(console.error);
             otp = getRandomIntInclusive(111111, 999999);
-            res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0], otp: otp }, message: "user found" });
             let update = await userSchema.findByIdAndUpdate(checkExist[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+            delete checkExist[0]._id;
+            res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0], otp: otp }, message: "user found" });
             let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
             await main(checkExist[0].email, message);
             return

@@ -103,8 +103,7 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
             },
             {
                 $project: {
-                    __v: 0,
-                    _id: 0
+                    __v: 0
                 }
             }
         ]);
@@ -112,10 +111,12 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
 
 
         if (checkExist.length > 0) {
+
             if (!(await bcrypt.compare(password, checkExist[0].password))) {
                 return res.status(401).json({ issuccess: true, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
             }
             delete checkExist[0].password
+
             // let user = {
             //     _id: checkExist[0]._id,
             //     timestamp: Date.now()
@@ -129,6 +130,7 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
 
             otp = getRandomIntInclusive(111111, 999999);
             let update = await adminSchema.findByIdAndUpdate(checkExist[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+            delete checkExist[0]._id
             res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { email: checkExist[0].email, role: checkExist[0].role, mobileNo: checkExist[0].mobileNo, isEmailVerified: checkExist[0].isEmailVerified, isMobileVerified: checkExist[0].isMobileVerified, id: checkExist[0]._id }, otp: otp }, message: "otp sent to email" });
             if ('email' in checkExist[0]) {
                 let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
