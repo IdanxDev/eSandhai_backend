@@ -4,8 +4,8 @@ require("dotenv").config();
 const s3 = require('./setup/aws_setup')
 const fs = require('fs')
 const stream = require('stream')
-
-const uploadProfileImageToS3 = (baseKey) => {
+const { DeleteObjectCommand } = require('@aws-sdk/client-s3')
+exports.uploadProfileImageToS3 = (baseKey) => {
     try {
         // console.log(baseKey);
         // const s3 = new aws.S3();
@@ -15,7 +15,7 @@ const uploadProfileImageToS3 = (baseKey) => {
         return multer({
             storage: multerS3({
                 s3: s3,
-                bucket: 'ichallengebucket',
+                bucket: 'delux-cleaner',
                 acl: 'public-read',
                 contentType: multerS3.AUTO_CONTENT_TYPE,
                 metadata: function (req, file, cb) {
@@ -45,7 +45,23 @@ const uploadProfileImageToS3 = (baseKey) => {
         console.log(err)
     }
 };
-const uploadImage = multer({
+exports.removeObject = (key) => {
+    try {
+        return new Promise(async (resolve, reject) => {
+            await s3.send(new DeleteObjectCommand({ Bucket: 'delux-cleaner', Key: key })).then((data) => {
+                console.log("Success. Object deleted.", data);;
+                resolve(data)
+            }).catch((err) => {
+                reject(err)
+            })
+        });
+    }
+    catch (err) {
+        console.log("error");
+        console.log(err)
+    }
+};
+exports.uploadImage = multer({
     storage: multerS3({
         s3: s3,
         bucket: 'ichallengebucket',
@@ -82,8 +98,4 @@ function makeid(length) {
             charactersLength));
     }
     return result;
-}
-module.exports = {
-    uploadProfileImageToS3: uploadProfileImageToS3,
-    uploadImage: uploadImage
 }

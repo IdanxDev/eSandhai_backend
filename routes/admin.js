@@ -15,6 +15,8 @@ const { getPlaces, placeFilter, formatAddress } = require('../utility/mapbox')
 const { generateAccessToken, authenticateToken, generateRefreshToken, checkUserRole } = require('../middleware/auth');
 const addressSchema = require('../models/addressSchema');
 const { checkErr } = require('../utility/error');
+const { uploadProfileImageToS3, removeObject } = require('../utility/aws');
+const categorySchema = require('../models/categorySchema');
 const regex = /^(1[0-2]|0[1-9])\/(3[01]|[12][0-9]|0[1-9])\/[0-9]{4}$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -126,7 +128,7 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
             // main().catch(console.error);
 
             otp = getRandomIntInclusive(111111, 999999);
-            let update = await userSchema.findByIdAndUpdate(checkExist[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+            let update = await adminSchema.findByIdAndUpdate(checkExist[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
             res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { email: checkExist[0].email, role: checkExist[0].role, mobileNo: checkExist[0].mobileNo, isEmailVerified: checkExist[0].isEmailVerified, isMobileVerified: checkExist[0].isMobileVerified, id: checkExist[0]._id }, otp: otp }, message: "otp sent to email" });
             if ('email' in checkExist[0]) {
                 let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
@@ -300,7 +302,7 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
     try {
         const { otp, id, password } = req.body;
 
-        let checkUser = await userSchema.aggregate([
+        let checkUser = await adminSchema.aggregate([
             {
                 $match: {
                     $or: [
@@ -325,7 +327,7 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         if (timeIs >= startIs && timeIs <= endIs) {
             //otp valid
             if (checkUser[0].otp == otp) {
-                let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
+                let updatePassword = await adminSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
             }
             else {
@@ -343,102 +345,127 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
     }
 })
 router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
-    const { userId } = req.body;
-    let match;
-    if (userId != undefined) {
-        match = {
-            $match: {
-                _id: mongoose.Types.ObjectId(userId)
+    try {
+        const { userId } = req.body;
+        let match;
+        if (userId != undefined) {
+            match = {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
             }
         }
-    }
-    else {
-        match = {
-            $match: {
+        else {
+            match = {
+                $match: {
 
+                }
             }
         }
+        let getUsers = await userSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            },
+            {
+                $addFields: {
+                    currentPlan: { $ifNull: ["$currentPlan", "Unspecified"] },
+                    country: "Usa",
+                    mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+                    email: { $ifNull: ["$email", "Unspecified"] },
+                    status: { $ifNull: ["$status", 0] }
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
-    let getUsers = await userSchema.aggregate([
-        match,
-        {
-            $addFields: {
-                id: "$_id"
-            }
-        },
-        {
-            $project: {
-                __v: 0,
-                _id: 0,
-                password: 0,
-                otp: 0,
-                generatedTime: 0,
-                createdAt: 0,
-                updatedAt: 0
-            }
-        },
-        {
-            $addFields: {
-                currentPlan: { $ifNull: ["$currentPlan", "Unspecified"] },
-                country: "Usa",
-                mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
-                email: { $ifNull: ["$email", "Unspecified"] },
-                status: { $ifNull: ["$status", 0] }
-            }
-        }
-    ])
-    return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
 })
 router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
-    const { userId } = req.body;
-    let match;
-    if (userId != undefined) {
-        match = {
-            $match: {
-                _id: mongoose.Types.ObjectId(userId)
+    try {
+        const { userId } = req.body;
+        let match;
+        if (userId != undefined) {
+            match = {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
             }
         }
-    }
-    else {
-        match = {
-            $match: {
+        else {
+            match = {
+                $match: {
 
+                }
             }
         }
+        let getUsers = await adminSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            },
+            {
+                $addFields: {
+                    country: "Usa",
+                    mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+                    email: { $ifNull: ["$email", "Unspecified"] },
+                    status: { $ifNull: ["$status", 0] }
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
-    let getUsers = await adminSchema.aggregate([
-        match,
-        {
-            $addFields: {
-                id: "$_id"
-            }
-        },
-        {
-            $project: {
-                __v: 0,
-                _id: 0,
-                password: 0,
-                otp: 0,
-                generatedTime: 0,
-                createdAt: 0,
-                updatedAt: 0
-            }
-        },
-        {
-            $addFields: {
-                country: "Usa",
-                mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
-                email: { $ifNull: ["$email", "Unspecified"] },
-                status: { $ifNull: ["$status", 0] }
-            }
-        }
-    ])
-    return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
 })
-router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
-    const { userId } = req.body;
+router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin', 'admin']), uploadProfileImageToS3('icons').single('image'), async (req, res) => {
+    try {
+        const { name } = req.body;
+        console.log(name);
+        let checkCategory = await categorySchema.findOne({ name: name });
+        console.log(req.file);
+        if (checkCategory != undefined || checkCategory != null) {
+            removeObject(req.file.key)
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkCategory }, message: `${name} already registered` });
+        }
 
-    return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
+        let addCategory = new categorySchema({
+            name: name,
+            icon: req.file.location
+        })
+
+        await addCategory.save();
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${name} successfully added` });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
 })
 router.get('/refresh', generateRefreshToken);
 
