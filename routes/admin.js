@@ -17,6 +17,7 @@ const addressSchema = require('../models/addressSchema');
 const { checkErr } = require('../utility/error');
 const { uploadProfileImageToS3, removeObject } = require('../utility/aws');
 const categorySchema = require('../models/categorySchema');
+const subscriptionSchema = require('../models/subscriptionSchema');
 const regex = /^(1[0-2]|0[1-9])\/(3[01]|[12][0-9]|0[1-9])\/[0-9]{4}$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -329,7 +330,10 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         if (timeIs >= startIs && timeIs <= endIs) {
             //otp valid
             if (checkUser[0].otp == otp) {
-                let updatePassword = await adminSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
+
+                const salt = await bcrypt.genSalt(10);
+                const hashedpassword = await bcrypt.hash(password, salt);
+                let updatePassword = await adminSchema.findByIdAndUpdate(checkUser[0]._id, { password: hashedpassword }, { new: true });
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
             }
             else {
@@ -473,6 +477,7 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
                 _id: mongoose.Types.ObjectId(userId)
             })
         }
+        console.log(anotherMatch);
         if (anotherMatch.length > 0) {
             match = {
                 $match: {
@@ -519,28 +524,221 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin', 'admin']), uploadProfileImageToS3('icons').single('image'), async (req, res) => {
+router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('icons').single('image'),
+    [body("name").isString().withMessage("please provide valid category name"),
+    body('description').optional().isString().withMessage("please provide valid description"),
+    body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field")], checkErr, async (req, res) => {
+        try {
+            const { name, description, isVisible } = req.body;
+            let checkCategory = await categorySchema.findOne({ name: name });
+            console.log(req.file);
+            if (checkCategory != undefined || checkCategory != null) {
+                removeObject(req.file.key)
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} already registered` });
+            }
+            let addCategory = new categorySchema({
+                name: name,
+                icon: req.file.location,
+                description: description,
+                isVisible: isVisible
+            })
+
+            await addCategory.save();
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${name} successfully added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.put('/updateCategory', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('icons').single('image'), [body("name").optional().isString().withMessage("please provide valid category name"),
+body('description').optional().isString().withMessage("please provide valid description"),
+body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field"),
+body('categoryId').custom((value) => { return mongoose.Types.ObjectId.isValid(value) }).withMessage("please provide category id")], checkErr, async (req, res) => {
     try {
-        const { name } = req.body;
-        console.log(name);
-        let checkCategory = await categorySchema.findOne({ name: name });
-        console.log(req.file);
-        if (checkCategory != undefined || checkCategory != null) {
-            removeObject(req.file.key)
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkCategory }, message: `${name} already registered` });
+        const { name, categoryId, description, isVisible } = req.body;
+
+        let checkCategory = await categorySchema.findById(categoryId);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: true, data: null }, message: `Categoory not found` });
+        }
+        let addCategory = {
+            name: name,
+            icon: req.file != undefined ? req.file.location : checkCategory.location,
+            isVisible: isVisible,
+            description: description
         }
 
-        let addCategory = new categorySchema({
-            name: name,
-            icon: req.file.location
-        })
-
-        await addCategory.save();
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${name} successfully added` });
+        if (req.file != undefined) {
+            let result = checkCategory.icon.indexOf("icons");
+            let key = checkCategory.icon.substring(result, checkCategory.icon.length)
+            if (key != undefined) {
+                removeObject(key)
+            }
+        }
+        let update = await categorySchema.findByIdAndUpdate(categoryId, addCategory, { new: true });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `${update.name} successfully updated` });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getCategory', authenticateToken, async (req, res) => {
+    try {
+        let getUsers = await categorySchema.aggregate([
+            {
+                $match: {
+                    isVisible: true
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    isVisible: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/addPlan', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('plans').single('image'),
+    [body('name').isString().withMessage("please pass subscription name"),
+    body('pickup').isNumeric().withMessage("please pass numeric pickup"),
+    body('delivery').isNumeric().withMessage("please pass delivery numbers"),
+    body('month').isNumeric().withMessage("please pass monthly price"),
+    body('year').isNumeric().withMessage("please pass yearly price"),
+    body('tag').optional().isString().withMessage("please pass additional tag"),
+    body('isVisible').optional().isBoolean().withMessage("please pass boolean for visibility"),
+    ]
+    , checkErr, async (req, res) => {
+        try {
+            const { name,
+                pickup,
+                delivery,
+                month,
+                year,
+                tag,
+                isVisible } = req.body;
+            let checkCategory = await subscriptionSchema.findOne({ name: name, pickup: pickup, delivery: delivery, month: month, year: year });
+            if (checkCategory != undefined || checkCategory != null) {
+                removeObject(req.file.key)
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} plan already exist` });
+            }
+            if (req.file == undefined || req.file.location == undefined) {
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please upload icon image` });
+            }
+            let addCategory = new subscriptionSchema({
+                name: name,
+                icon: req.file.location,
+                pickup: pickup,
+                delivery: delivery,
+                month: month,
+                isVisible: isVisible,
+                year: year,
+                tag: tag
+            })
+
+            await addCategory.save();
+            addCategory._doc['id'] = addCategory._doc['_id'];
+            delete addCategory._doc.updatedAt;
+            delete addCategory._doc.createdAt;
+            delete addCategory._doc._id;
+            delete addCategory._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${name} successfully plan created` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.put('/updatePlan', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('plans').single('image'),
+    [body('name').optional().isString().withMessage("please pass subscription name"),
+    body('pickup').optional().isNumeric().withMessage("please pass numeric pickup"),
+    body('delivery').optional().isNumeric().withMessage("please pass delivery numbers"),
+    body('month').optional().isNumeric().withMessage("please pass monthly price"),
+    body('year').optional().isNumeric().withMessage("please pass yearly price"),
+    body('tag').optional().isString().withMessage("please pass additional tag"),
+    body('isVisible').optional().isBoolean().withMessage("please pass boolean for visibility"),
+    body('planId').custom((value) => { return mongoose.Types.ObjectId.isValid(value) }).withMessage("please pass plan id")
+    ]
+    , checkErr, async (req, res) => {
+        try {
+            const { name,
+                pickup,
+                delivery,
+                month,
+                year,
+                tag,
+                isVisible, planId } = req.body;
+            // console.log(planId);
+            let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
+            // console.log(checkCategory);
+            if (checkCategory == undefined || checkCategory == null) {
+                return res.status(404).json({ issuccess: true, data: { acknowledgement: true, data: null }, message: `Categoory not found` });
+            }
+            let addCategory = {
+                pickup: pickup,
+                delivery: delivery,
+                month: month,
+                year: year,
+                tag: tag,
+                name: name,
+                icon: req.file != undefined ? req.file.location : checkCategory.icon,
+                isVisible: isVisible
+            }
+
+            if (req.file != undefined) {
+                let result = checkCategory.icon.indexOf("plans");
+                let key = checkCategory.icon.substring(result, checkCategory.icon.length)
+                if (key != undefined) {
+                    removeObject(key)
+                }
+            }
+            let update = await subscriptionSchema.findByIdAndUpdate(planId, addCategory, { new: true });
+            update._doc['id'] = update._doc['_id'];
+            delete update._doc.updatedAt;
+            delete update._doc.createdAt;
+            delete update._doc._id;
+            delete update._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `${update.name} successfully updated` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.get('/getPlan', authenticateToken, async (req, res) => {
+    try {
+        let getUsers = await subscriptionSchema.aggregate([
+            {
+                $match: {
+                    isVisible: true
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    isVisible: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+
 router.get('/refresh', generateRefreshToken);
 
 function validateEmail(emailAdress) {

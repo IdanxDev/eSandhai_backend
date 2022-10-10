@@ -9,6 +9,10 @@ const categorySchema = mongoose.Schema({
         type: String,
         default: ""
     },
+    description: {
+        type: String,
+        default: ""
+    },
     isVisible: {
         type: Boolean,
         default: true

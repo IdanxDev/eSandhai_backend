@@ -19,7 +19,7 @@ exports.generateRefreshToken = (req, res, next) => {
             // if (getData && getData == "0") {
             //     return res.status(440).json({ issuccess: true, data: { acknowledgement: true }, message: "session logged out" });
             // }
-            const accessToken = await generateAccessTokenOnly({
+            const accessToken = await this.generateAccessTokenOnly({
                 _id: user._id,
                 role: user.role,
                 // deviceId: user.deviceId,
