@@ -14,6 +14,8 @@ const { getPlaces, placeFilter, formatAddress } = require('../utility/mapbox')
 const { generateAccessToken, authenticateToken, generateRefreshToken } = require('../middleware/auth');
 const addressSchema = require('../models/addressSchema');
 const { checkErr } = require('../utility/error');
+const userSubscription = require('../models/userSubscription');
+const subscriptionSchema = require('../models/subscriptionSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -71,7 +73,7 @@ router.post('/signUp-Old', async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/signUp', [body('email').isEmail().withMessage("please pass email id"), body('password').isString().withMessage("please pass password")], checkErr, async (req, res, next) => {
+router.post('/signUp', [body('email').isEmail().withMessage("please pass email id"), body('password').not().isEmpty().isString().withMessage("please pass password")], checkErr, async (req, res, next) => {
     try {
         const { email, password } = req.body;
 
@@ -648,10 +650,16 @@ router.get('/getPlace', async (req, res, next) => {
 })
 router.post('/addAddress', authenticateToken, async (req, res, next) => {
     try {
-        const { addressType, lat, long, placeAddress, placeName, isDefault, street, houseNo, pincode, landmark, locality, city, district, region, country } = req.body;
+        const { addressType, lat, long, placeAddress, placeName, mobileNo, countryCode, street, houseNo, pincode, landmark, locality, city, district, region, country } = req.body;
         const userId = req.user._id
-        if (isDefault) {
-            let update = addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
+        let { isDefault } = req.body;
+        console.log(isDefault);
+        if (isDefault != undefined && isDefault == true) {
+            let update = await addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
+        }
+        else {
+            let checkAddressDefault = await addressSchema.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { isDefault: true }] } }]);
+            isDefault = checkAddressDefault.length > 0 ? false : true
         }
         let createAddress = new addressSchema({
             addressType: addressType,
@@ -669,7 +677,9 @@ router.post('/addAddress', authenticateToken, async (req, res, next) => {
             country: country,
             userId: userId,
             lat: lat,
-            long: long
+            long: long,
+            mobileNo: mobileNo,
+            countryCode: countryCode
         })
 
         await createAddress.save();
@@ -682,8 +692,9 @@ router.post('/addAddress', authenticateToken, async (req, res, next) => {
 })
 router.put('/updateAddress', authenticateToken, async (req, res, next) => {
     try {
-        const { addressType, lat, long, addressId, placeAddress, placeName, isDefault, street, houseNo, pincode, landmark, locality, city, district, region, country } = req.body;
+        const { addressType, lat, long, addressId, mobileNo, countryCode, placeAddress, placeName, street, houseNo, pincode, landmark, locality, city, district, region, country } = req.body;
         const userId = req.user._id
+        let { isDefault } = req.body;
         let checkAddress = await addressSchema.aggregate([
             {
                 $match: {
@@ -695,7 +706,7 @@ router.put('/updateAddress', authenticateToken, async (req, res, next) => {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "address not found" });
         }
         if (isDefault) {
-            let update = addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
+            let update = await addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
         }
         let createAddress = {
             addressType: addressType == undefined ? checkAddress[0].addressType : addressType,
@@ -712,6 +723,8 @@ router.put('/updateAddress', authenticateToken, async (req, res, next) => {
             region: region == undefined ? checkAddress[0].region : region,
             country: country == undefined ? checkAddress[0].country : country,
             lat: lat == undefined ? checkAddress[0].lat : lat,
+            mobileNo: mobileNo == undefined ? checkAddress[0].mobileNo : mobileNo,
+            countryCode: countryCode == undefined ? checkAddress[0].countryCode : countryCode,
             long: long == undefined ? checkAddress[0].long : long
         }
         let updateAdd = await addressSchema.findByIdAndUpdate(addressId, createAddress, { new: true });
@@ -751,7 +764,127 @@ router.get('/address', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/addSubscription', authenticateToken, async (req, res, next) => {
+    try {
+        const { planId } = req.body;
+        const userId = req.user._id;
+        let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
+        }
+        let createAddress = new userSubscription({
+            planId: planId,
+            userId: userId,
+            pickup: checkCategory.pickup,
+            delivery: checkCategory.delivery,
+        })
 
+        await createAddress.save();
+        createAddress._doc['id'] = createAddress._doc['_id'];
+        delete createAddress._doc.updatedAt;
+        delete createAddress._doc.createdAt;
+        delete createAddress._doc._id;
+        delete createAddress._doc.__v;
+        delete createAddress._doc.paymentId;
+        delete createAddress._doc.orderStatus;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user subscription added" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateSubscription', authenticateToken, async (req, res, next) => {
+    try {
+        const { subscriptionId, status, paymentId } = req.body;
+        const userId = req.user._id;
+        let checkCategory = await userSubscription.findById(mongoose.Types.ObjectId(subscriptionId));
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
+        }
+        let updateField = {
+            status: status,
+            paymentId: paymentId
+        }
+        let createAddress = await userSubscription.findByIdAndUpdate(subscriptionId, updateField, { new: true });
+        createAddress._doc['id'] = createAddress._doc['_id'];
+        delete createAddress._doc.updatedAt;
+        delete createAddress._doc.createdAt;
+        delete createAddress._doc._id;
+        delete createAddress._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user subscription updated" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getSubscription', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        let getAddress = await userSubscription.aggregate([
+            {
+                $match: {
+                    userId: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $lookup: {
+                    from: "subscriptions",
+                    let: { id: "$planId" },
+                    pipeline: [{
+                        $match: {
+                            $expr: {
+                                $eq: ["$_id", "$$id"]
+                            }
+                        }
+                    },
+                    {
+                        $addFields: {
+                            "id": "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            __v: 0,
+                            isVisible: 0,
+                            createdAt: 0,
+                            updatedAt: 0
+                        }
+                    }],
+                    as: "planDetails"
+                }
+            },
+            {
+                $addFields: {
+                    planDetails: { $first: "$planDetails" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ]);
+
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 
 function validateEmail(emailAdress) {
     let regexEmail = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;

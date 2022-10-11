@@ -558,7 +558,7 @@ body('categoryId').custom((value) => { return mongoose.Types.ObjectId.isValid(va
 
         let checkCategory = await categorySchema.findById(categoryId);
         if (checkCategory == undefined || checkCategory == null) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: true, data: null }, message: `Categoory not found` });
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `Categoory not found` });
         }
         let addCategory = {
             name: name,
@@ -679,7 +679,7 @@ router.put('/updatePlan', authenticateToken, checkUserRole(['superAdmin']), uplo
             let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
             // console.log(checkCategory);
             if (checkCategory == undefined || checkCategory == null) {
-                return res.status(404).json({ issuccess: true, data: { acknowledgement: true, data: null }, message: `Categoory not found` });
+                return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
             }
             let addCategory = {
                 pickup: pickup,
@@ -733,7 +733,7 @@ router.get('/getPlan', authenticateToken, async (req, res) => {
                 }
             }
         ])
-        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
+        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `subscription found` : "no subscription plan found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

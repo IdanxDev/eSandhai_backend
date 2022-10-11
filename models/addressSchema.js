@@ -34,7 +34,12 @@ const addressSchema = mongoose.Schema({
         type: String
     },
     mobileNo: {
-        type: String
+        type: String,
+        default: ""
+    },
+    countryCode: {
+        type: String,
+        default: ""
     },
     lat: Number,
     long: Number,
