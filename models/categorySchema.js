@@ -13,6 +13,10 @@ const categorySchema = mongoose.Schema({
         type: String,
         default: ""
     },
+    isSubscription: {
+        type: Boolean,
+        default: false
+    },
     isVisible: {
         type: Boolean,
         default: true
