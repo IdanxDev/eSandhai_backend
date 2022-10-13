@@ -532,15 +532,19 @@ router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin']), up
     body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field")], checkErr, async (req, res) => {
         try {
             const { name, description, isSubscription, isVisible } = req.body;
+            if (req.file == undefined || req.file.location == undefined) {
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please pass image field` });
+            }
             let checkCategory = await categorySchema.findOne({ name: name });
             console.log(req.file);
             if (checkCategory != undefined || checkCategory != null) {
                 removeObject(req.file.key)
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} already registered` });
             }
+
             let addCategory = new categorySchema({
                 name: name,
-                icon: req.file.location,
+                icon: req.file != undefined ? req.file.location : "",
                 description: description,
                 isSubscription: isSubscription,
                 isVisible: isVisible
@@ -601,20 +605,22 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
     try {
         let match;
         let anotherMatch = [];
+        console.log(Boolean(req.query.isVisible));
         if ('name' in req.query) {
             let regEx = new RegExp(req.query.name, 'i')
             anotherMatch.push({ name: { $regex: regEx } })
         }
         if ('isVisible' in req.query) {
-            anotherMatch.push({ isVisible: Boolean(req.query.isVisible) })
+            anotherMatch.push({ isVisible: req.query.isVisible === 'true' })
         }
         if ('isSubscription' in req.query) {
-            anotherMatch.push({ isSubscription: Boolean(req.query.isSubscription) })
+            anotherMatch.push({ isSubscription: req.query.isSubscription === 'true' })
         }
         if ('description' in req.query) {
             let regEx = new RegExp(req.query.description, 'i')
             anotherMatch.push({ description: { $regex: regEx } })
         }
+        console.log(anotherMatch);
         if (anotherMatch.length > 0) {
             match = {
                 $match: {
@@ -687,7 +693,7 @@ router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploa
             }
             let addCategory = new itemSchema({
                 name: name,
-                icon: req.file.location,
+                icon: req.file != undefined ? req.file.location : "",
                 description: description,
                 mrp: mrp,
                 discount: discount != undefined ? discount : value,
@@ -742,7 +748,7 @@ body('categoryId').custom((value) => { return mongoose.Types.ObjectId.isValid(va
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.get('/getCategory', authenticateToken, async (req, res) => {
+router.get('/getItems', authenticateToken, async (req, res) => {
     try {
         let match;
         let anotherMatch = [];
@@ -760,6 +766,7 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
             let regEx = new RegExp(req.query.description, 'i')
             anotherMatch.push({ description: { $regex: regEx } })
         }
+        console.log(anotherMatch);
         if (anotherMatch.length > 0) {
             match = {
                 $match: {
