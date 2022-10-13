@@ -566,7 +566,7 @@ router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin']), up
             console.log(req.file);
             if (checkCategory != undefined || checkCategory != null) {
                 removeObject(req.file.key)
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} already registered` });
+                return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} already registered` });
             }
 
             let addCategory = new categorySchema({
