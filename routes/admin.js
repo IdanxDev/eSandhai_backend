@@ -149,6 +149,93 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/updateProfile', authenticateToken, [check('name', 'please pass valid name').optional().notEmpty().isString().withMessage("please pass valid name"),
+check('birthDate', 'please pass valid date').optional().notEmpty().trim().custom((value) => { return /^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[13-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$/.test(value) }).withMessage("please pass valid date"),
+check('mobileNo', 'please pass valid mobile no').optional().notEmpty().isMobilePhone().withMessage("please pass valid mobile no"),
+check('email', 'please pass valid email').optional().notEmpty().isEmail().withMessage("please pass valid email")], checkErr, async (req, res, next) => {
+    try {
+        const { name, birthDate, mobileNo, email, isVerify } = req.body;
+
+        const userId = req.user._id
+
+        let checkEmail = await adminSchema.aggregate([
+            {
+                $match: {
+                    $or: [
+                        {
+                            $and: [
+                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+                                { email: email }
+                            ]
+                        },
+                        {
+                            $and: [
+                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+                                { mobileNo: mobileNo }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ])
+        if (checkEmail.length != 0) {
+            let state = 4;
+            if (email != undefined && email == checkEmail[0].email && userId != checkEmail[0]._id.toString()) {
+                state = 0
+            }
+            if (mobileNo != undefined && mobileNo == checkEmail[0].mobileNo && userId != checkEmail[0]._id.toString()) {
+                state = 1
+            }
+            if (state != 4) {
+                delete checkEmail[0]._id;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: checkEmail[0] }, message: state == 0 ? "thie email already exist" : "this mobile no already exist" });
+            }
+        }
+        let updateUser = await adminSchema.findByIdAndUpdate(userId, { email: email, name: name, mobileNo: mobileNo, birthDate: birthDate }, { new: true })
+        updateUser._doc['id'] = updateUser._doc['_id'];
+        delete updateUser._doc.updatedAt;
+        delete updateUser._doc.createdAt;
+        delete updateUser._doc._id;
+        delete updateUser._doc.__v;
+        delete updateUser._doc.generatedTime;
+        delete updateUser._doc.otp
+
+        if (isVerify != undefined && isVerify == true) {
+            if (email != undefined && validateEmail(email)) {
+                otp = getRandomIntInclusive(111111, 999999);
+                res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser, otp: otp }, message: "user found" });
+                let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+                let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
+                await main(checkExist[0].email, message);
+            }
+            else if (mobileNo != undefined && validatePhoneNumber(mobileNo)) {
+                otp = getRandomIntInclusive(111111, 999999);
+                res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser, otp: otp }, message: "otp sent to mobile no" });
+
+                console.log(otp);
+                let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+                let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
+                await sendSms(countryCode + mobileNo, `Helllo User, Your otp for laundary service is ${otp} , Please Do not share this otp with anyone`);
+
+            }
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser }, message: "user details updated" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.post('/resendOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no")], checkErr, async (req, res, next) => {
     try {
         const { id } = req.body;
@@ -483,7 +570,7 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
                 }
             }
         ])
-        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
@@ -547,7 +634,7 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
                 }
             }
         ])
-        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
@@ -678,46 +765,59 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
                 }
             }
         ])
-        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('icons').single('image'),
-    [body("name").isString().withMessage("please provide valid category name"),
-    body('description').optional().isString().withMessage("please provide valid description"),
-    body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field")], checkErr, async (req, res) => {
+router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('items').single('image'),
+    [body("name", 'please provide valid category name').isString(),
+    body('description', 'please provide valid description').optional().isString(),
+    body('isVisible', 'please provide valid visibility field').optional().isBoolean(),
+    body('isBag', 'please pass valid bag').optional().isBoolean(),
+    body('mrp').isNumeric().withMessage("please pass mrp"),
+    body('discount', 'please pass discount').optional().notEmpty().isNumeric(),
+    body('price', 'please pass valid price value').optional().notEmpty().isNumeric(),
+    body('priceTag', 'please pass valid price tag').optional().notEmpty().isString()], checkErr, async (req, res) => {
         try {
             const { name, description, isVisible,
                 mrp,
                 discount,
                 price,
                 isBag,
-                priceTag,
-                categoryId } = req.body;
-            let checkCategory = await itemSchema.findOne({ categoryId: mongoose.Types.ObjectId(categoryId), name: name, price: price, priceTag: priceTag });
-            console.log(req.file);
+                categoryId,
+                priceTag } = req.body;
+            console.log(req.body);
+            if (req.file == undefined || req.file.location == undefined) {
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please pass image field` });
+            }
+            let checkCategory = await itemSchema.findOne({ categoryId: mongoose.Types.ObjectId(categoryId), name: name, mrp: mrp });
             if (checkCategory != undefined || checkCategory != null) {
                 removeObject(req.file.key)
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} already item exist in same category` });
             }
             let value = 0;
+            console.log(price);
             if (price == undefined && (mrp == undefined || discount == undefined)) {
-                value = mrp - discount != 0 ? (discount / 100) : 0;
+                // value = mrp - discount != 0 ? (discount / 100) : 0;
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please pass mrp and discount value` });
             }
             if (discount == undefined && (mrp == undefined || price == undefined)) {
-                discountIs = mrp - price
-                value = mrp - discount != 0 ? (discount / 100) : 0;
+                // discountIs = mrp - price
+                // value = mrp - discount != 0 ? (discount / 100) : 0;
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please pass mrp and price value` });
             }
-            if (price == undefined && mrp != undefined || discount != undefined) {
-                value = mrp - discount != 0 ? (discount / 100) : 0;
+            if (price == undefined && mrp != undefined && discount != undefined) {
+                value = mrp - (discount != 0 ? (discount * (mrp / 100)) : 0);
+                console.log((discount / 100));
+                console.log(value);
             }
-            if (discount == undefined && mrp != undefined || price != undefined) {
+            if (discount == undefined && mrp != undefined && price != undefined) {
                 discountIs = mrp - price
-                value = mrp - discount != 0 ? (discount / 100) : 0;
+                value = mrp - discountIs != 0 ? (discountIs * 100 / mrp) : 0;
+                console.log(discountIs + "  " + value);
             }
+            console.log(value);
             let addCategory = new itemSchema({
                 name: name,
                 icon: req.file != undefined ? req.file.location : "",
@@ -742,39 +842,79 @@ router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploa
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
-router.put('/updateItems', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('icons').single('image'), [body("name").optional().isString().withMessage("please provide valid category name"),
-body('description').optional().isString().withMessage("please provide valid description"),
-body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field"),
-body('isSubscription').optional().isBoolean().withMessage("please provide valid subscription field"),
-body('categoryId').custom((value) => { return mongoose.Types.ObjectId.isValid(value) }).withMessage("please provide category id")], checkErr, async (req, res) => {
-    try {
-        const { name, categoryId, description, isSubscription, isVisible } = req.body;
-
-        let checkCategory = await categorySchema.findById(categoryId);
-        if (checkCategory == undefined || checkCategory == null) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `Categoory not found` });
-        }
-        let addCategory = {
-            name: name,
-            icon: req.file != undefined ? req.file.location : checkCategory.location,
-            isVisible: isVisible,
-            description: description,
-            isSubscription: isSubscription
-        }
-
-        if (req.file != undefined) {
-            let result = checkCategory.icon.indexOf("icons");
-            let key = checkCategory.icon.substring(result, checkCategory.icon.length)
-            if (key != undefined) {
-                removeObject(key)
+router.put('/updateItems', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('items').single('image'), [
+    body("name", 'please provide valid category name').optional().isString(),
+    body('description', 'please provide valid description').optional().isString(),
+    body('isVisible', 'please provide valid visibility field').optional().isBoolean(),
+    body('mrp').optional().isNumeric().withMessage("please pass mrp"),
+    body('discount', 'please pass discount').optional().notEmpty().isNumeric(),
+    body('price', 'please pass valid price value').optional().notEmpty().isNumeric(),
+    body('priceTag', 'please pass valid price tag').optional().notEmpty().isString(),
+    body('categoryId', 'please provide category id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+    body('itemId', 'please pass valid item id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res) => {
+        try {
+            const { name, categoryId, description, isVisible, isBag, priceTag, itemId } = req.body;
+            let { mrp, price, discount } = req.body;
+            let checkCategory = await itemSchema.findById(itemId);
+            if (checkCategory == undefined || checkCategory == null) {
+                return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `item not found` });
             }
+
+            let checkItem = await itemSchema.findById(itemId);
+            if (checkItem == undefined || checkItem == null) {
+                return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `item not found` });
+            }
+            if (price == undefined && mrp != undefined && discount != undefined) {
+                price = mrp - (discount != 0 ? (discount * (mrp / 100)) : 0);
+            }
+            if (discount == undefined && mrp != undefined && price != undefined) {
+                discountIs = mrp - price
+                discount = mrp - discountIs != 0 ? (discountIs * 100 / mrp) : 0;
+            }
+            if (mrp != undefined && price == undefined && discount == undefined) {
+                discount = checkItem.discount;
+                price = mrp - (discount != 0 ? (discount * (mrp / 100)) : 0);
+            }
+            if (discount != undefined && mrp == undefined && price == undefined) {
+                mrp = checkItem.mrp;
+                price = mrp - (discount != 0 ? (discount * (mrp / 100)) : 0);
+            }
+            if (price != undefined && mrp == undefined && discount == undefined) {
+                mrp = checkItem.mrp;
+                discountIs = mrp - price
+                discount = mrp - discountIs != 0 ? (discountIs * 100 / mrp) : 0;
+            }
+            let addCategory = {
+                name: name,
+                icon: req.file != undefined ? req.file.location : checkItem.icon,
+                description: description,
+                mrp: mrp,
+                discount: discount,
+                isBag: isBag,
+                priceTag: priceTag,
+                price: price,
+                isVisible: isVisible,
+                categoryId: categoryId
+            }
+
+            if (req.file != undefined) {
+                let result = checkItem.icon.indexOf("items");
+                let key = checkItem.icon.substring(result, checkItem.icon.length)
+                if (key != undefined) {
+                    removeObject(key)
+                }
+            }
+            let update = await itemSchema.findByIdAndUpdate(itemId, addCategory, { new: true });
+            update._doc['id'] = update._doc['_id'];
+            delete update._doc.updatedAt;
+            delete update._doc.createdAt;
+            delete update._doc._id;
+            delete update._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `${update.name} successfully updated` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
-        let update = await categorySchema.findByIdAndUpdate(categoryId, addCategory, { new: true });
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `${update.name} successfully updated` });
-    } catch (error) {
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
+    })
 router.get('/getItems', authenticateToken, async (req, res) => {
     try {
         let match;
@@ -784,16 +924,34 @@ router.get('/getItems', authenticateToken, async (req, res) => {
             anotherMatch.push({ name: { $regex: regEx } })
         }
         if ('isVisible' in req.query) {
-            anotherMatch.push({ isVisible: Boolean(req.query.isVisible) })
-        }
-        if ('isSubscription' in req.query) {
-            anotherMatch.push({ isSubscription: Boolean(req.query.isSubscription) })
+            anotherMatch.push({ isVisible: req.query.isVisible === 'true' })
         }
         if ('description' in req.query) {
             let regEx = new RegExp(req.query.description, 'i')
             anotherMatch.push({ description: { $regex: regEx } })
         }
-        console.log(anotherMatch);
+        if ('categoryId' in req.query) {
+            anotherMatch.push({ categoryId: mongoose.Types.ObjectId(req.query.categoryId) })
+        }
+        if ('isBag' in req.query) {
+            anotherMatch.push({ isBag: req.query.isBag === 'true' })
+        }
+        if ('priceTag' in req.query) {
+            let regEx = new RegExp(req.query.priceTag, 'i')
+            anotherMatch.push({ priceTag: { $regex: regEx } })
+        }
+        if ('itemId' in req.query) {
+            anotherMatch.push({ _id: mongoose.Types.ObjectId(req.query.itemId) })
+        }
+        if ('mrpStart' in req.query == true && 'mrpEnd' in req.query == true) {
+            anotherMatch.push({ $and: [{ mrp: { "$gte": parseFloat(req.query.mrpStart) } }, { mrp: { "$lte": parseFloat(req.query.mrpEnd) } }] });
+        }
+        if ('discountStart' in req.query == true && 'discountEnd' in req.query == true) {
+            anotherMatch.push({ $and: [{ discount: { "$gte": parseFloat(req.query.discountStart) } }, { discount: { "$lte": parseFloat(req.query.discountEnd) } }] });
+        }
+        if ('priceStart' in req.query == true && 'priceEnd' in req.query == true) {
+            anotherMatch.push({ $and: [{ price: { "$gte": parseFloat(req.query.priceStart) } }, { price: { "$lte": parseFloat(req.query.priceEnd) } }] });
+        }
         if (anotherMatch.length > 0) {
             match = {
                 $match: {
@@ -808,7 +966,7 @@ router.get('/getItems', authenticateToken, async (req, res) => {
                 }
             }
         }
-        let getUsers = await categorySchema.aggregate([
+        let getUsers = await itemSchema.aggregate([
             match,
             {
                 $addFields: {
