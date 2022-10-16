@@ -687,6 +687,13 @@ body('categoryId').custom((value) => { return mongoose.Types.ObjectId.isValid(va
         if (checkCategory == undefined || checkCategory == null) {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `Categoory not found` });
         }
+        if ('name' in req.body) {
+            let checkName = await categorySchema.findOne({ name: name });
+            if (checkName != undefined || checkName != null) {
+                return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} already registered` });
+            }
+        }
+
         let addCategory = {
             name: name,
             icon: req.file != undefined ? req.file.location : checkCategory.location,
@@ -797,7 +804,6 @@ router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploa
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} already item exist in same category` });
             }
             let value = 0;
-            console.log(price);
             if (price == undefined && (mrp == undefined || discount == undefined)) {
                 // value = mrp - discount != 0 ? (discount / 100) : 0;
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please pass mrp and discount value` });
@@ -855,14 +861,24 @@ router.put('/updateItems', authenticateToken, checkUserRole(['superAdmin']), upl
         try {
             const { name, categoryId, description, isVisible, isBag, priceTag, itemId } = req.body;
             let { mrp, price, discount } = req.body;
-            let checkCategory = await itemSchema.findById(itemId);
-            if (checkCategory == undefined || checkCategory == null) {
-                return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `item not found` });
-            }
-
             let checkItem = await itemSchema.findById(itemId);
             if (checkItem == undefined || checkItem == null) {
                 return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `item not found` });
+            }
+            if (categoryId != null && categoryId != undefined) {
+                let checkCategory = await categorySchema.findById(categoryId);
+                if (checkCategory == undefined || checkCategory == null) {
+                    return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `category not found` });
+                }
+
+                console.log("checkCate");
+                console.log(checkCategory);
+            }
+            if (name != undefined && name != null) {
+                let checkItemExist = await itemSchema.findOne({ name: name, categoryId: categoryId != null && categoryId != undefined ? mongoose.Types.ObjectId(categoryId) : checkItem.categoryId, mrp: mrp != undefined && mrp != null ? mrp : checkItem.mrp });
+                if (checkItemExist != undefined && checkItemExist != null && checkItemExist._id.toString() != itemId) {
+                    return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} similar item already exist` });
+                }
             }
             if (price == undefined && mrp != undefined && discount != undefined) {
                 price = mrp - (discount != 0 ? (discount * (mrp / 100)) : 0);
