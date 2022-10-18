@@ -19,7 +19,7 @@ const { uploadProfileImageToS3, removeObject } = require('../utility/aws');
 const categorySchema = require('../models/categorySchema');
 const subscriptionSchema = require('../models/subscriptionSchema');
 const itemSchema = require('../models/itemSchema');
-const regex = /^(1[0-2]|0[1-9])\/(3[01]|[12][0-9]|0[1-9])\/[0-9]{4}$/;
+const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
 body('role').isIn(["superAdmin", "admin", "employee"]).withMessage("please pass valid role"),
@@ -689,7 +689,7 @@ body('categoryId').custom((value) => { return mongoose.Types.ObjectId.isValid(va
         }
         if ('name' in req.body) {
             let checkName = await categorySchema.findOne({ name: name });
-            if (checkName != undefined || checkName != null) {
+            if (checkName != undefined && checkName != null && checkName._id.toString() != categoryId) {
                 return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${name} already registered` });
             }
         }
@@ -766,9 +766,7 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
             {
                 $project: {
                     _id: 0,
-                    __v: 0,
-                    createdAt: 0,
-                    updatedAt: 0
+                    __v: 0
                 }
             }
         ])
@@ -990,11 +988,27 @@ router.get('/getItems', authenticateToken, async (req, res) => {
                 }
             },
             {
+                $lookup: {
+                    from: "categories",
+                    localField: "categoryId",
+                    foreignField: "_id",
+                    as: "categoryData"
+                }
+            },
+            {
+                $addFields: {
+                    categoryName: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$categoryData" }, 0] }, then: { $first: "$categoryData.name" }, else: ""
+                        }
+                    }
+                }
+            },
+            {
                 $project: {
                     _id: 0,
                     __v: 0,
-                    createdAt: 0,
-                    updatedAt: 0
+                    categoryData: 0
                 }
             }
         ])
@@ -1008,6 +1022,7 @@ router.post('/addPlan', authenticateToken, checkUserRole(['superAdmin']), upload
     body('pickup').isNumeric().withMessage("please pass numeric pickup"),
     body('delivery').isNumeric().withMessage("please pass delivery numbers"),
     body('month').isNumeric().withMessage("please pass monthly price"),
+    body('quarterly').isNumeric().withMessage("please pass quarterly price"),
     body('year').isNumeric().withMessage("please pass yearly price"),
     body('tag').optional().isString().withMessage("please pass additional tag"),
     body('isVisible').optional().isBoolean().withMessage("please pass boolean for visibility"),
@@ -1018,6 +1033,7 @@ router.post('/addPlan', authenticateToken, checkUserRole(['superAdmin']), upload
                 pickup,
                 delivery,
                 month,
+                quarterly,
                 year,
                 tag,
                 isVisible } = req.body;
@@ -1035,6 +1051,7 @@ router.post('/addPlan', authenticateToken, checkUserRole(['superAdmin']), upload
                 pickup: pickup,
                 delivery: delivery,
                 month: month,
+                quarterly: quarterly,
                 isVisible: isVisible,
                 year: year,
                 tag: tag
@@ -1056,6 +1073,7 @@ router.put('/updatePlan', authenticateToken, checkUserRole(['superAdmin']), uplo
     body('pickup').optional().isNumeric().withMessage("please pass numeric pickup"),
     body('delivery').optional().isNumeric().withMessage("please pass delivery numbers"),
     body('month').optional().isNumeric().withMessage("please pass monthly price"),
+    body('quarterly').optional().isNumeric().withMessage("please pass quarterly price"),
     body('year').optional().isNumeric().withMessage("please pass yearly price"),
     body('tag').optional().isString().withMessage("please pass additional tag"),
     body('isVisible').optional().isBoolean().withMessage("please pass boolean for visibility"),
@@ -1067,6 +1085,7 @@ router.put('/updatePlan', authenticateToken, checkUserRole(['superAdmin']), uplo
                 pickup,
                 delivery,
                 month,
+                quarterly,
                 year,
                 tag,
                 isVisible, planId } = req.body;
@@ -1080,6 +1099,7 @@ router.put('/updatePlan', authenticateToken, checkUserRole(['superAdmin']), uplo
                 pickup: pickup,
                 delivery: delivery,
                 month: month,
+                quarterly: quarterly,
                 year: year,
                 tag: tag,
                 name: name,

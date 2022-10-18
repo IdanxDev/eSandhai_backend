@@ -21,6 +21,10 @@ const subscriptionSchema = mongoose.Schema({
         type: Number,
         default: 0
     },
+    quarterly: {
+        type: Number,
+        default: 0
+    },
     year: {
         type: Number,
         default: 0

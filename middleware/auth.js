@@ -75,7 +75,7 @@ exports.authenticateToken = async (req, res, next) => {
 //authenticate access token
 exports.authenticateTokenWithUserId = async (req, res, next) => {
     // console.log(req.headers)
-    if (req.body.hasOwnProperty('userId')) {
+    if ('userId' in req.body) {
         next();
         return;
     }

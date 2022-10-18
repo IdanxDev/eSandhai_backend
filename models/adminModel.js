@@ -10,6 +10,11 @@ const adminSchema = mongoose.Schema({
     email: {
         type: String
     },
+    gender: {
+        type: String,
+        default: "Male",
+        enum: ["Male", "Female", "Other"]
+    },
     role: {
         type: String,
         enum: ["superAdmin", "admin", "employee"],
