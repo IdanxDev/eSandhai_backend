@@ -13,6 +13,10 @@ const riderSchema = mongoose.Schema({
         type: String,
         default: ""
     },
+    image: {
+        type: String,
+        default: ""
+    },
     email: {
         type: String,
         default: ""

@@ -19,6 +19,7 @@ const { uploadProfileImageToS3, removeObject } = require('../utility/aws');
 const categorySchema = require('../models/categorySchema');
 const subscriptionSchema = require('../models/subscriptionSchema');
 const itemSchema = require('../models/itemSchema');
+const helperSchema = require('../models/helperSchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -764,6 +765,26 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
                 }
             },
             {
+                $lookup: {
+                    from: "helpers",
+                    let: { id: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$categoryId", "$$id"] }, { $eq: ["$isVisible", true] }] } } },
+                    {
+                        $addFields: {
+                            "id": "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            __v: 0,
+                            isVisible: 0
+                        }
+                    }],
+                    as: "helperData"
+                }
+            },
+            {
                 $project: {
                     _id: 0,
                     __v: 0
@@ -771,6 +792,162 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
             }
         ])
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/addHelper', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('helper').single('image'),
+    [body("title").isString().withMessage("please provide valid category name"),
+    body('description').optional().isString().withMessage("please provide valid description"),
+    body('categoryId', 'please provide category id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+    body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field")], checkErr, async (req, res) => {
+        try {
+            const { title, description, categoryId, isVisible } = req.body;
+            if (req.file == undefined || req.file.location == undefined) {
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please pass image field` });
+            }
+            let checkCategory = await helperSchema.findOne({ title: title, categoryId: mongoose.Types.ObjectId(categoryId) });
+            console.log(req.file);
+            if (checkCategory != undefined || checkCategory != null) {
+                removeObject(req.file.key)
+                return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${title} already registered` });
+            }
+
+            let addCategory = new helperSchema({
+                title: title,
+                icon: req.file != undefined ? req.file.location : "",
+                description: description,
+                categoryId: categoryId,
+                isVisible: isVisible
+            })
+
+            await addCategory.save();
+            addCategory._doc['id'] = addCategory._doc['_id'];
+            delete addCategory._doc.updatedAt;
+            delete addCategory._doc.createdAt;
+            delete addCategory._doc._id;
+            delete addCategory._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${title} successfully added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.put('/updateHelper', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('helper').single('image'),
+    [body("title").optional().notEmpty().isString().withMessage("please provide valid category name"),
+    body('description').optional().isString().withMessage("please provide valid description"),
+    body('categoryId', 'please provide category id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+    body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field"),
+    body('helperId', 'please provide helper id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+    ], checkErr, async (req, res) => {
+        try {
+            const { title, categoryId, description, helperId, isVisible } = req.body;
+
+            let checkCategory = await helperSchema.findById(helperId);
+            if (checkCategory == undefined || checkCategory == null) {
+                return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `helper not found` });
+            }
+            if ('title' in req.body) {
+                let checkName = await helperSchema.findOne({ title: title, categoryId: 'categoryId' in req.body ? categoryId : checkCategory.categoryId });
+                if (checkName != undefined && checkName != null && checkName._id.toString() != helperId) {
+                    return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${title} already registered` });
+                }
+            }
+
+            let addCategory = {
+                title: title,
+                icon: req.file != undefined ? req.file.location : checkCategory.location,
+                isVisible: isVisible,
+                description: description,
+                categoryId: categoryId
+            }
+
+            if (req.file != undefined) {
+                let result = checkCategory.icon.indexOf("helper");
+                let key = checkCategory.icon.substring(result, checkCategory.icon.length)
+                if (key != undefined) {
+                    removeObject(key)
+                }
+            }
+            let update = await helperSchema.findByIdAndUpdate(categoryId, addCategory, { new: true });
+            if (update != undefined) {
+                update._doc['id'] = update._doc['_id'];
+                delete update._doc.updatedAt;
+                delete update._doc.createdAt;
+                delete update._doc._id;
+                delete update._doc.__v;
+            }
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `${update.name} successfully updated` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.get('/getHelper', authenticateToken, async (req, res) => {
+    try {
+        let match;
+        let anotherMatch = [];
+        if ('title' in req.query) {
+            let regEx = new RegExp(req.query.title, 'i')
+            anotherMatch.push({ title: { $regex: regEx } })
+        }
+        if ('isVisible' in req.query) {
+            anotherMatch.push({ isVisible: req.query.isVisible === 'true' })
+        }
+        if ('description' in req.query) {
+            let regEx = new RegExp(req.query.description, 'i')
+            anotherMatch.push({ description: { $regex: regEx } })
+        }
+        if ('categoryId' in req.query) {
+            anotherMatch.push({ categoryId: mongoose.Types.ObjectId(req.query.categoryId) })
+        }
+        console.log(anotherMatch);
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await helperSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+
+            {
+                $lookup: {
+                    from: "categories",
+                    localField: "categoryId",
+                    foreignField: "_id",
+                    as: "categoryData"
+                }
+            },
+            {
+                $addFields: {
+                    categoryName: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$categoryData" }, 0] }, then: { $first: "$categoryData.name" }, else: ""
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    categoryData: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category helper found` : "no category found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
@@ -783,7 +960,8 @@ router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploa
     body('mrp').isNumeric().withMessage("please pass mrp"),
     body('discount', 'please pass discount').optional().notEmpty().isNumeric(),
     body('price', 'please pass valid price value').optional().notEmpty().isNumeric(),
-    body('priceTag', 'please pass valid price tag').optional().notEmpty().isString()], checkErr, async (req, res) => {
+    body('priceTag', 'please pass valid price tag').optional().notEmpty().isString(),
+    body('categoryId', 'please provide category id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res) => {
         try {
             const { name, description, isVisible,
                 mrp,
