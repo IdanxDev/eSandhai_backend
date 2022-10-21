@@ -82,7 +82,7 @@ body('mobileNo').isMobilePhone().withMessage("please pass mobile no")], checkErr
         await main(email, message);
         await sendSms(countryCode + mobileNo, `Helllo ${name}, welcome to delux laundry system <br> Your registration successful now , Please start your work as scheduled`);
 
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: userIs }, Messsage: "sign up successfully" });;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: userIs }, message: "sign up successfully" });;
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
