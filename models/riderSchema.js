@@ -51,6 +51,10 @@ const riderSchema = mongoose.Schema({
     activeStatus: {
         type: Number,
         default: 0
+    },
+    fatherName: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

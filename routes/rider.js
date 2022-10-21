@@ -47,7 +47,7 @@ body('mobileNo').isMobilePhone().withMessage("please pass mobile no")], checkErr
         ]);
 
         if (checkExist.length > 0) {
-            return res.status(409).json({ issuccess: true, data: { acknowledgement: false }, message: "rider already exist" });
+            return res.status(409).json({ issuccess: false, data: { acknowledgement: false }, message: "rider already exist" });
         }
 
         // const userLoginIs = new userLogin({
@@ -110,7 +110,7 @@ router.post('/login', [body('mobileNo').isMobilePhone().withMessage("please pass
             return;
             // return res.status(409).json({ IsSuccess: true, Data: [], Messsage: "user already exist" });
         }
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: false }, message: "user not found" });
+        return res.status(404).json({ issuccess: false, data: { acknowledgement: false }, message: "user not found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
@@ -132,7 +132,7 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
 
         let checkUser = await riderSchema.findById(userId);
         if (checkUser == undefined || checkUser == null) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: false }, message: "no user found with this ids" });
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false }, message: "no user found with this ids" });
         }
         if (req.file != undefined && req.file.location != undefined) {
             let result = checkUser.image.indexOf("rider");
@@ -187,7 +187,7 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
             }
         ]);
         if (checkUser.length == 0) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "no user details found" });
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no user details found" });
 
         }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser[0] }, message: "user details found" });
@@ -208,7 +208,7 @@ router.post('/resendOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone
             }
         ])
         if (checkOtp.length == 0) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: false }, message: "no user found with this ids" });
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false }, message: "no user found with this ids" });
         }
 
         otp = getRandomIntInclusive(111111, 999999);
@@ -248,7 +248,7 @@ router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').is
         ]);
 
         if (checkUser.length == 0) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${id}` });
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${id}` });
         }
         if (otp == '000000') {
             let updateData = {}
@@ -299,13 +299,13 @@ router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').is
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0, generatedToken: generatedToken, refreshToken: refreshToken }, message: `otp verifed successfully` });
             }
             else {
-                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
+                return res.status(401).json({ issuccess: false, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
             }
             console.log("valid")
         }
         else {
             //otp expired
-            return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
+            return res.status(410).json({ issuccess: false, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
         }
 
     } catch (error) {
@@ -331,7 +331,7 @@ router.post('/authenticateOtp', [oneOf([body('id').isEmail(), body('id').isMobil
         ]);
 
         if (checkUser.length == 0) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${userId}` });
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${userId}` });
         }
 
         if (otp == '000000') {
@@ -354,13 +354,13 @@ router.post('/authenticateOtp', [oneOf([body('id').isEmail(), body('id').isMobil
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0, generatedToken: generatedToken, refreshToken: refreshToken }, message: `otp verifed successfully` });
             }
             else {
-                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
+                return res.status(401).json({ issuccess: false, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
             }
             console.log("valid")
         }
         else {
             //otp expired
-            return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
+            return res.status(410).json({ issuccess: false, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
         }
 
     } catch (error) {
@@ -386,12 +386,12 @@ router.put('/updateWithOtp', authenticateTokenWithUserId, [oneOf([body('id').isE
         ]);
 
         if (checkUser.length == 0) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found ` });
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, status: 3 }, message: `No User Found ` });
         }
         if (otp == '000000') {
             let checkExist = await riderSchema.findOne({ $and: [{ _id: { $nin: [mongoose.Types.ObjectId(userId)] } }, { $or: [{ mobileNo: id }, { email: id }] }] });
             if (checkExist != undefined && checkExist != null) {
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, status: checkExist.email }, message: checkExist.email == id ? `email already in use` : `mobile no already in use` });
+                return res.status(403).json({ issuccess: false, data: { acknowledgement: false, status: checkExist.email }, message: checkExist.email == id ? `email already in use` : `mobile no already in use` });
             }
             let updateData = {}
             if (validateEmail(id)) {
@@ -424,7 +424,7 @@ router.put('/updateWithOtp', authenticateTokenWithUserId, [oneOf([body('id').isE
             if (checkUser[0].otp == otp) {
                 let checkExist = await riderSchema.findOne({ $and: [{ _id: { $nin: [mongoose.Types.ObjectId(userId)] } }, { $or: [{ mobileNo: id }, { email: id }] }] });
                 if (checkExist != undefined && checkExist != null) {
-                    return res.status(200).json({ issuccess: true, data: { acknowledgement: false, status: checkExist.email }, message: checkExist.email == id ? `email already in use` : `mobile no already in use` });
+                    return res.status(403).json({ issuccess: false, data: { acknowledgement: false, status: checkExist.email }, message: checkExist.email == id ? `email already in use` : `mobile no already in use` });
                 }
                 let updateData = {}
                 if (validateEmail(id)) {
@@ -446,13 +446,13 @@ router.put('/updateWithOtp', authenticateTokenWithUserId, [oneOf([body('id').isE
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateRider }, message: `details updated` });
             }
             else {
-                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
+                return res.status(401).json({ issuccess: false, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
             }
             console.log("valid")
         }
         else {
             //otp expired
-            return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
+            return res.status(410).json({ issuccess: false, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
         }
 
     } catch (error) {

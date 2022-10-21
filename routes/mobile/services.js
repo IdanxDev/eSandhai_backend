@@ -4,6 +4,7 @@ const { generateAccessToken, authenticateToken, generateRefreshToken } = require
 const categorySchema = require('../../models/categorySchema');
 const helperSchema = require('../../models/helperSchema');
 const itemSchema = require('../../models/itemSchema');
+const subscriptionSchema = require('../../models/subscriptionSchema');
 router.get('/getCategory', authenticateToken, async (req, res) => {
     try {
         let match;
@@ -232,6 +233,34 @@ router.get('/getHelper', authenticateToken, async (req, res) => {
             }
         ])
         return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: getUsers.length > 0 ? true : false, data: { acknowledgement: getUsers.length > 0 ? true : false, data: getUsers }, message: getUsers.length > 0 ? `category helper found` : "no category helper found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getPlan', authenticateToken, async (req, res) => {
+    try {
+        let getUsers = await subscriptionSchema.aggregate([
+            {
+                $match: {
+                    isVisible: true
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    isVisible: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: getUsers.length > 0 ? true : false, data: { acknowledgement: getUsers.length > 0 ? true : false, data: getUsers }, message: getUsers.length > 0 ? `subscription found` : "no subscription plan found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
