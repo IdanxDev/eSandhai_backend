@@ -24,7 +24,7 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
             let regEx = new RegExp(req.query.description, 'i')
             anotherMatch.push({ description: { $regex: regEx } })
         }
-        console.log(anotherMatch);
+        anotherMatch.push({ isVisible: true })
         if (anotherMatch.length > 0) {
             match = {
                 $match: {
@@ -115,6 +115,7 @@ router.get('/getItems', authenticateToken, async (req, res) => {
         if ('priceStart' in req.query == true && 'priceEnd' in req.query == true) {
             anotherMatch.push({ $and: [{ price: { "$gte": parseFloat(req.query.priceStart) } }, { price: { "$lte": parseFloat(req.query.priceEnd) } }] });
         }
+        anotherMatch.push({ isVisible: true })
         if (anotherMatch.length > 0) {
             match = {
                 $match: {
@@ -184,6 +185,7 @@ router.get('/getHelper', authenticateToken, async (req, res) => {
         if ('categoryId' in req.query) {
             anotherMatch.push({ categoryId: mongoose.Types.ObjectId(req.query.categoryId) })
         }
+        anotherMatch.push({ isVisible: true })
         console.log(anotherMatch);
         if (anotherMatch.length > 0) {
             match = {

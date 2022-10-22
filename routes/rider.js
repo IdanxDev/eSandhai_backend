@@ -160,6 +160,51 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/updateInsurance', authenticateToken, uploadProfileImageToS3('rider').single('image'), [body('name', 'please enter valid name').optional().notEmpty().isString(),
+body('gender', "please pass dob").optional().isIn(["Male", "Female", "Other"]),
+body('dob', "please pass dob").optional().custom((value) => { return regex.test(value) }),
+body('jobStatus', 'please enter valid status').optional().isBoolean(),
+body('activeStatus', 'please enter valid active status').optional().isNumeric()
+], checkErr, async (req, res, next) => {
+    try {
+        const { name,
+            dob,
+            gender,
+            jobStatus,
+            activeStatus } = req.body;
+
+        const userId = req.user._id
+
+        let checkUser = await riderSchema.findById(userId);
+        if (checkUser == undefined || checkUser == null) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false }, message: "no user found with this ids" });
+        }
+        if (req.file != undefined && req.file.location != undefined) {
+            let result = checkUser.image.indexOf("rider");
+            let key = checkUser.image.substring(result, checkUser.image.length)
+            if (key != undefined) {
+                removeObject(key)
+            }
+        }
+        let update = {
+            name: name,
+            dob: dob,
+            gender: gender,
+            jobStatus: jobStatus,
+            activeStatus: activeStatus,
+            image: req.file != undefined && req.file.location != undefined ? req.file.location : checkUser.image
+        }
+        let updateRider = await riderSchema.findByIdAndUpdate(userId, update, { new: true });
+        updateRider._doc["id"] = updateRider._doc["_id"];
+        delete updateRider._doc.__v;
+        delete updateRider._doc._id;
+        delete updateRider._doc.generatedTime;
+        delete updateRider._doc.otp;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateRider }, message: "user details updated" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getProfile', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
@@ -367,16 +412,10 @@ router.post('/authenticateOtp', [oneOf([body('id').isEmail(), body('id').isMobil
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.put('/updateWithOtp', authenticateTokenWithUserId, [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"), body('otp').isNumeric().withMessage("please pass otp"), body('userId', 'please pass userId').optional().custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
+router.put('/updateWithOtp', authenticateToken, [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"), body('otp').isNumeric().withMessage("please pass otp"), body('userId', 'please pass userId').optional().custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
     try {
         const { otp, id } = req.body;
-        let userId = req.body.userId;;
-        if ((userId == undefined || userId == null) && (req.user != undefined && 'id' in req.user)) {
-            userId = req.user._id;
-        }
-        if (userId == undefined || userId == null) {
-            return res.status(400).json({ issuccess: false, data: { acknowledgement: false }, message: `please send valid request` });
-        }
+        const userId = req.user._id;
         let checkUser = await riderSchema.aggregate([
             {
                 $match: {

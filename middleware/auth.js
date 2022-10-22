@@ -38,7 +38,7 @@ exports.generateRefreshToken = (req, res, next) => {
 }
 exports.checkUserRole = (roles) => {
     return async function (req, res, next) {
-        if (!roles.includes(req.user.role)) {
+        if (req.user != undefined && req.user.role != undefined && !roles.includes(req.user.role)) {
             return res.status(401).json({ issuccess: false, data: { acknowledgement: false }, message: "you does not have permission to access this data" })
         }
         next();
@@ -89,12 +89,34 @@ exports.authenticateTokenWithUserId = async (req, res, next) => {
         if (err) return res.status(403).json({ issuccess: false, data: { acknowledgement: false }, message: "Token Expired or Invalid Token" });
         // console.log(user);
         req.user = {
-            _id: user._id
+            _id: user._id,
+            role: user.role
         }
         next()
     })
 }
+exports.authenticateTokenWithUserIdForAdmin = async (req, res, next) => {
+    // console.log(req.headers)
+    if ('userId' in req.body) {
+        next();
+        return;
+    }
+    const authHeader = req.headers['authorization']
+    // console.log(authHeader)
+    const token = authHeader && authHeader.split(' ')[1] || req.signedCookies.access_token
+    // console.log(token);
+    if (!token) return res.status(401).json({ issuccess: false, data: { acknowledgement: false }, message: "please send valid request" });
 
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ issuccess: false, data: { acknowledgement: false }, message: "Token Expired or Invalid Token" });
+        // console.log(user);
+        req.user = {
+            _id: user._id,
+            role: user.role
+        }
+        next()
+    })
+}
 exports.parseJwt = (token) => {
     var base64Url = token.split('.')[1];
     var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');

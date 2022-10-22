@@ -55,6 +55,18 @@ const riderSchema = mongoose.Schema({
     fatherName: {
         type: String,
         default: ""
+    },
+    insurance: {
+        type: Boolean,
+        default: false
+    },
+    riderInsurance: {
+        type: String,
+        default: ""
+    },
+    riderExpiry: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

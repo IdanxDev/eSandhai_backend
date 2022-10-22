@@ -9,6 +9,7 @@ const categorySchema = mongoose.Schema({
         type: String,
         default: ""
     },
+    //description to discount
     description: {
         type: String,
         default: ""

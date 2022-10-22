@@ -1,18 +1,6 @@
 const mongoose = require('mongoose');
 // const bcrypt = require('bcrypt');
 const vehicleSchema = mongoose.Schema({
-    insurance: {
-        type: Boolean,
-        default: false
-    },
-    riderInsurance: {
-        type: String,
-        default: ""
-    },
-    riderExpiry: {
-        type: String,
-        default: ""
-    },
     registrationNo: {
         type: String,
         default: ""
@@ -60,6 +48,10 @@ const vehicleSchema = mongoose.Schema({
     insuranceExpiry: {
         type: String,
         default: ""
+    },
+    userId: {
+        type: mongoose.Types.ObjectId,
+        ref: "riders"
     }
 }, { timestamps: true });
 

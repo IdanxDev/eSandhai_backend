@@ -20,6 +20,10 @@ const categorySchema = require('../models/categorySchema');
 const subscriptionSchema = require('../models/subscriptionSchema');
 const itemSchema = require('../models/itemSchema');
 const helperSchema = require('../models/helperSchema');
+const vehicleSchema = require('../models/vehicleSchema');
+const riderSchema = require('../models/riderSchema');
+const { query } = require('express');
+const proofSchema = require('../models/proofSchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -1553,7 +1557,342 @@ router.get('/getPlan', authenticateToken, async (req, res) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.put('/updateRider', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('rider').single('image'), [body('name', 'please enter valid name').optional().notEmpty().isString(),
+body('gender', "please pass dob").optional().isIn(["Male", "Female", "Other"]),
+body('dob', "please pass dob").optional().custom((value) => { return regex.test(value) }),
+body('fatherName', 'please enter valid fathername value').optional().notEmpty().isString(),
+body('jobStatus', 'please enter valid status').optional().isBoolean(),
+body('activeStatus', 'please enter valid active status').optional().isNumeric(),
+body('insurance', 'please enter insurance active or not').optional().isBoolean(),
+body('riderInsurance', 'please enter rider insurance number').optional().notEmpty().isString(),
+body('riderExpiry', 'please enter rider expiry number').optional().notEmpty().custom((value) => { return regex.test(value) }),
+body('riderId', 'please enter valid rider id').notEmpty().custom((value) => mongoose.Types.ObjectId.isValid(value))
+], checkErr, async (req, res, next) => {
+    try {
+        const { name,
+            dob,
+            gender,
+            jobStatus,
+            activeStatus,
+            fatherName,
+            insurance,
+            riderInsurance,
+            riderExpiry
+        } = req.body;
 
+        const userId = req.body.riderId
+
+        let checkUser = await riderSchema.findById(userId);
+        if (checkUser == undefined || checkUser == null) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false }, message: "no user found with this ids" });
+        }
+        if (req.file != undefined && req.file.location != undefined) {
+            let result = checkUser.image.indexOf("rider");
+            let key = checkUser.image.substring(result, checkUser.image.length)
+            if (key != undefined) {
+                removeObject(key)
+            }
+        }
+        let update = {
+            name: name,
+            dob: dob,
+            gender: gender,
+            jobStatus: jobStatus,
+            activeStatus: activeStatus,
+            fatherName: fatherName,
+            insurance: insurance,
+            riderInsurance: riderInsurance,
+            riderExpiry: riderExpiry,
+            image: req.file != undefined && req.file.location != undefined ? req.file.location : checkUser.image
+        }
+        let updateRider = await riderSchema.findByIdAndUpdate(userId, update, { new: true });
+        updateRider._doc["id"] = updateRider._doc["_id"];
+        delete updateRider._doc.__v;
+        delete updateRider._doc._id;
+        delete updateRider._doc.generatedTime;
+        delete updateRider._doc.otp;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateRider }, message: "user details updated" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateRiderVehicle', authenticateToken, checkUserRole(['superAdmin']),
+    [body('registrationNo', 'please enter valid registration number').optional().notEmpty().isString(),
+    body('registrationDate', 'please enter valid registration number').optional().notEmpty().isString().custom((value) => { return regex.test(value) }),
+    body('chassisNo', 'please enter valid chassis number').optional().notEmpty().isString(),
+    body('engineNo', 'please enter valid engineNo number').optional().notEmpty().isString(),
+    body('ownerName', 'please enter valid ownerName').optional().notEmpty().isString(),
+    body('vehicleClass', 'please enter valid vehicle class').optional().notEmpty().isString(),
+    body('fuel', 'please enter valid fuel class').optional().notEmpty().isString(),
+    body('model', 'please enter valid vehicle model').optional().notEmpty().isString(),
+    body('manufacturer', 'please enter valid manufacturer').optional().notEmpty().isString(),
+    body('vehicleInsurance', 'please enter insurance available or not').optional().notEmpty().isBoolean(),
+    body('insuranceExpiry', 'please enter valid insuranceExpiry date').optional().notEmpty().isString().custom((value) => { return regex.test(value) }),
+    body('insuranceNumber', 'please enter valid insuranceNumber').optional().notEmpty().isString(),
+    body('riderId', 'please enter valid rider').notEmpty().custom((value) => mongoose.Types.ObjectId.isValid(value))
+    ]
+    , checkErr, async (req, res) => {
+        try {
+            const { registrationNo,
+                registrationDate,
+                chassisNo,
+                engineNo,
+                ownerName,
+                vehicleClass,
+                fuel,
+                model,
+                manufacturer,
+                vehicleInsurance,
+                insuranceNumber,
+                insuranceExpiry } = req.body;
+            // console.log(planId);
+            const userId = req.body.riderId;
+            let checkUser = await riderSchema.findById(userId);
+            if (checkUser == undefined || checkUser == null) {
+                return res.status(404).json({ issuccess: false, data: { acknowledgement: false }, message: "no user found with this ids" });
+            }
+            let checkVehicle = await vehicleSchema.findOne({ userId: userId });
+            if (checkVehicle == undefined || checkVehicle == null) {
+                let vehicle = new vehicleSchema(Object.assign({ userId: userId }, req.body));
+                await vehicle.save();
+                vehicle._doc['id'] = vehicle._doc['_id'];
+                delete vehicle._doc.updatedAt;
+                delete vehicle._doc.createdAt;
+                delete vehicle._doc._id;
+                delete vehicle._doc.__v;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: vehicle }, message: `vehicle details added` });
+            }
+            let vehicle = await vehicleSchema.findByIdAndUpdate(checkVehicle._id, req.body, { new: true });
+            if (vehicle != undefined) {
+                vehicle._doc['id'] = vehicle._doc['_id'];
+                delete vehicle._doc.updatedAt;
+                delete vehicle._doc.createdAt;
+                delete vehicle._doc._id;
+                delete vehicle._doc.__v;
+            }
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: vehicle }, message: `vehicle details updated` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.put('/updateRiderWithOtp', authenticateToken, checkUserRole(["superAdmin"]), [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"),
+body('otp').isNumeric().withMessage("please pass otp"),
+body('riderId', 'please enter rider id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
+    try {
+        const { otp, id } = req.body;
+        const userId = req.body.riderId;
+        let checkUser = await riderSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
+            }
+        ]);
+
+        if (checkUser.length == 0) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, status: 3 }, message: `No User Found ` });
+        }
+        if (otp == '000000') {
+            let checkExist = await riderSchema.findOne({ $and: [{ _id: { $nin: [mongoose.Types.ObjectId(userId)] } }, { $or: [{ mobileNo: id }, { email: id }] }] });
+            if (checkExist != undefined && checkExist != null) {
+                return res.status(403).json({ issuccess: false, data: { acknowledgement: false, status: checkExist.email }, message: checkExist.email == id ? `email already in use` : `mobile no already in use` });
+            }
+            let updateData = {}
+            if (validateEmail(id)) {
+                updateData = {
+                    email: id
+                }
+            }
+            else if (validatePhoneNumber(id)) {
+                updateData = {
+                    mobileNo: id
+                }
+            }
+            let updateRider = await riderSchema.findByIdAndUpdate(userId, updateData, { new: true });
+            updateRider._doc["id"] = updateRider._doc["_id"];
+            delete updateRider._doc.__v;
+            delete updateRider._doc._id;
+            delete updateRider._doc.generatedTime;
+            delete updateRider._doc.otp;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateRider }, message: `details updated` });
+        }
+        const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
+        const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(5, 'minutes')).tz('Asia/Kolkata'));
+        const timeIs = (momentTz().tz('Asia/Kolkata'));
+        // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
+        // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
+        // const timeIs = moment();
+        console.log(startIs)
+        if (timeIs >= startIs && timeIs <= endIs) {
+            //otp valid
+            if (checkUser[0].otp == otp) {
+                let checkExist = await riderSchema.findOne({ $and: [{ _id: { $nin: [mongoose.Types.ObjectId(userId)] } }, { $or: [{ mobileNo: id }, { email: id }] }] });
+                if (checkExist != undefined && checkExist != null) {
+                    return res.status(403).json({ issuccess: false, data: { acknowledgement: false, status: checkExist.email }, message: checkExist.email == id ? `email already in use` : `mobile no already in use` });
+                }
+                let updateData = {}
+                if (validateEmail(id)) {
+                    updateData = {
+                        email: id
+                    }
+                }
+                else if (validatePhoneNumber(id)) {
+                    updateData = {
+                        mobileNo: id
+                    }
+                }
+                let updateRider = await riderSchema.findByIdAndUpdate(userId, updateData, { new: true });
+                updateRider._doc["id"] = updateRider._doc["_id"];
+                delete updateRider._doc.__v;
+                delete updateRider._doc._id;
+                delete updateRider._doc.generatedTime;
+                delete updateRider._doc.otp;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateRider }, message: `details updated` });
+            }
+            else {
+                return res.status(401).json({ issuccess: false, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
+            }
+            console.log("valid")
+        }
+        else {
+            //otp expired
+            return res.status(410).json({ issuccess: false, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
+        }
+
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getRiderDetails', authenticateToken, checkUserRole(["superAdmin"]), [
+    check('riderId', 'please enter rider id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
+        try {
+            const userId = req.query.riderId;
+            let checkUser = await riderSchema.aggregate([
+                {
+                    $match: {
+                        _id: mongoose.Types.ObjectId(userId)
+                    }
+                },
+                {
+                    $addFields: {
+                        "id": "$_id"
+                    }
+                },
+                {
+                    $addFields: {
+                        "completeDelivery": "1.23K",
+                        "completePickUp": "568",
+                        "pendingDelivery": "1.23K",
+                        "pendingPickUp": "568",
+                        "cancelledDelivery": "1.23K",
+                        "cancelledPickUp": "568"
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        __v: 0,
+                        generatedTime: 0,
+                        otp: 0
+                    }
+                }
+            ]);
+
+            return res.status(checkUser.length > 0 ? 200 : 404).json({ issuccess: checkUser.length > 0 ? true : false, data: { acknowledgement: checkUser.length > 0 ? true : false, data: checkUser.length > 0 ? checkUser[0] : checkUser }, message: checkUser.length > 0 ? `rider details found` : 'rider not found' });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.get('/getRiderVehicle', authenticateToken, checkUserRole(["superAdmin"]), [
+    check('riderId', 'please enter rider id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
+        try {
+            const userId = req.query.riderId;
+            let checkUser = await vehicleSchema.aggregate([
+                {
+                    $match: {
+                        userId: mongoose.Types.ObjectId(userId)
+                    }
+                },
+                {
+                    $addFields: {
+                        "id": "$_id"
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        __v: 0,
+                        generatedTime: 0,
+                        otp: 0
+                    }
+                }
+            ]);
+
+            return res.status(checkUser.length > 0 ? 200 : 404).json({ issuccess: checkUser.length > 0 ? true : false, data: { acknowledgement: checkUser.length > 0 ? true : false, data: checkUser.length > 0 ? checkUser[0] : checkUser }, message: checkUser.length > 0 ? `rider vehicle details found` : 'rider vehicle not found' });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.get('/getRiderProof', authenticateToken, checkUserRole(["superAdmin"]), [
+    check('riderId', 'please enter rider id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
+        try {
+            const userId = req.query.riderId;
+            let checkUser = await proofSchema.aggregate([
+                {
+                    $match: {
+                        userId: mongoose.Types.ObjectId(userId)
+                    }
+                },
+                {
+                    $addFields: {
+                        "id": "$_id"
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        __v: 0
+                    }
+                }
+            ]);
+
+            return res.status(checkUser.length > 0 ? 200 : 404).json({ issuccess: checkUser.length > 0 ? true : false, data: { acknowledgement: checkUser.length > 0 ? true : false, data: checkUser }, message: checkUser.length > 0 ? `rider proof found` : 'rider proof not found' });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.post('/addProof', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('proof').single('image'),
+    [body('title').notEmpty().isString().withMessage("please pass subscription name"),
+    body('riderId', 'please enter rider id').custom((value) => mongoose.Types.ObjectId.isValid(value)),
+    body('isVerified').optional().isBoolean().withMessage("please pass boolean for visibility"),
+    ]
+    , checkErr, async (req, res) => {
+        try {
+            const { riderId, title, isVerified } = req.body;
+            if (req.file == undefined || req.file.location == undefined) {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please upload icon image` });
+            }
+            let checkProof = await proofSchema.findOne({ userId: riderId, title: title });
+            if (checkProof != undefined && checkProof != null) {
+                return res.status(403).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `proof already exist` });
+            }
+            let addProof = new proofSchema({
+                title: title,
+                userId: riderId,
+                isVerified: isVerified,
+                image: req.file != undefined ? req.file.location : ""
+            })
+            await addProof.save();
+            addProof._doc['id'] = addProof._doc['_id'];
+            delete addProof._doc.updatedAt;
+            delete addProof._doc.createdAt;
+            delete addProof._doc._id;
+            delete addProof._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addProof }, message: `${title} proof added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
 router.get('/refresh', generateRefreshToken);
 
 function validateEmail(emailAdress) {
