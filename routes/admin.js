@@ -1861,6 +1861,25 @@ router.get('/getRiderProof', authenticateToken, checkUserRole(["superAdmin"]), [
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
+router.delete('/removeRiderProof', authenticateToken, checkUserRole(["superAdmin"]), [
+    check('proofId', 'please enter proof id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
+        try {
+            const userId = req.query.proofId;
+            let checkProof = await proofSchema.findById(userId);
+            if (checkProof == undefined || checkProof == null) {
+                return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `no proof found` });
+            }
+            let removeProof = await proofSchema.findByIdAndDelete(userId);
+            removeProof._doc['id'] = removeProof._doc['_id'];
+            delete removeProof._doc.updatedAt;
+            delete removeProof._doc.createdAt;
+            delete removeProof._doc._id;
+            delete removeProof._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: removeProof }, message: 'proof deleted' });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
 router.post('/addProof', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('proof').single('image'),
     [body('title').notEmpty().isString().withMessage("please pass subscription name"),
     body('riderId', 'please enter rider id').custom((value) => mongoose.Types.ObjectId.isValid(value)),
