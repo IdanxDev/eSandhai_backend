@@ -340,7 +340,7 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
 
         const userId = req.user._id
         if (otp == undefined && (email == undefined || mobileNo == undefined)) {
-            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
+            return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
         }
         let checkEmail = await userSchema.aggregate([
             {
@@ -363,7 +363,7 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
             }
         ])
         if (checkEmail.length > 0) {
-            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
+            return res.status(403).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
         }
         let checkUser = await userSchema.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }]);
         let updateUser = await userSchema.findByIdAndUpdate(userId, { gender: gender, name: name, birthDate: dob }, { new: true })
@@ -401,13 +401,13 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
                     return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update, status: 0 }, message: `details updated successfully` });
                 }
                 else {
-                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
+                    return res.status(401).json({ issuccess: false, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
                 }
                 console.log("valid")
             }
             else {
                 //otp expired
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
+                return res.status(403).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
             }
 
         }

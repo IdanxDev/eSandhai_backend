@@ -9,7 +9,7 @@ const timeSchema = mongoose.Schema({
         type: String,
         default: ""
     },
-    isEnable: {
+    isActive: {
         type: Boolean,
         default: false
     }

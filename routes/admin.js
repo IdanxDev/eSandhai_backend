@@ -24,6 +24,7 @@ const vehicleSchema = require('../models/vehicleSchema');
 const riderSchema = require('../models/riderSchema');
 const { query } = require('express');
 const proofSchema = require('../models/proofSchema');
+const timeSchema = require('../models/timeSchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -818,6 +819,138 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
             }
         ])
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/addTimerange', authenticateToken, checkUserRole(['superAdmin']),
+    [body("start", "please provide start hours").notEmpty().isString(),
+    body('end', "please provide ending hours").notEmpty().isString(),
+    body('isActive', "please provide valid active status field").optional().isBoolean(),
+    ], checkErr, async (req, res) => {
+        try {
+            const { start, end, isActive } = req.body;
+
+            let checkCategory = await timeSchema.findOne({ start: start, end: end });
+
+            if (checkCategory != undefined || checkCategory != null) {
+                return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${start} ${end} already registered` });
+            }
+
+            let addCategory = new timeSchema({
+                start: start,
+                end: end,
+                isActive: isActive
+            })
+
+            await addCategory.save();
+            addCategory._doc['id'] = addCategory._doc['_id'];
+            delete addCategory._doc.updatedAt;
+            delete addCategory._doc.createdAt;
+            delete addCategory._doc._id;
+            delete addCategory._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${start} ${end}  successfully added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.put('/updateTimerange', authenticateToken, checkUserRole(['superAdmin']),
+    [body("start", "please provide start hours").optional().notEmpty().isString(),
+    body('end', "please provide ending hours").optional().notEmpty().isString(),
+    body('isActive', "please provide valid active status field").optional().isBoolean(),
+    body('timerangeId', "please pass valid time range id").custom((value) => mongoose.Types.ObjectId.isValid(value))
+    ], checkErr, checkErr, async (req, res) => {
+        try {
+            const { start, end, isActive, timerangeId } = req.body;
+
+            let checkCategory = await timeSchema.findById(timerangeId);
+            if (checkCategory == undefined || checkCategory == null) {
+                return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `time range record not found` });
+            }
+            if ('start' in req.body || 'end' in req.body) {
+                let checkName = await timeSchema.findOne({ start: start != undefined ? start : checkCategory.start, end: end != undefined ? end : checkCategory.end });
+                if (checkName != undefined && checkName != null && checkName._id.toString() != timerangeId) {
+                    return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `this range already registered` });
+                }
+            }
+
+            let addCategory = {
+                start: start,
+                end: end,
+                isActive: isActive
+            }
+
+            let update = await timeSchema.findByIdAndUpdate(timerangeId, addCategory, { new: true });
+            if (update != undefined) {
+                update._doc['id'] = update._doc['_id'];
+                delete update._doc.updatedAt;
+                delete update._doc.createdAt;
+                delete update._doc._id;
+                delete update._doc.__v;
+            }
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `timerange successfully updated` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.get('/getTimerange', authenticateToken, async (req, res) => {
+    try {
+        let match;
+        let anotherMatch = [];
+        if ('isActive' in req.query) {
+            anotherMatch.push({ isActive: req.query.isActive === 'true' })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await timeSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: getUsers.length > 0 ? true : false, data: getUsers }, message: getUsers.length > 0 ? `time range found` : "no any time range found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

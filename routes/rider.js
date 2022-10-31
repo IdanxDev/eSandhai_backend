@@ -521,7 +521,7 @@ router.get('/getUsers', authenticateToken, checkUserRole(["superAdmin", "admin"]
             }
         }
     ])
-    return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
+    return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
 })
 
 router.get('/refresh', generateRefreshToken);
