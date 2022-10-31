@@ -330,6 +330,100 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/updateUser', authenticateToken, [body('name', 'please pass valid name').optional().notEmpty().isString(),
+body('dob', "please pass dob").notEmpty().optional().custom((value) => { return regex.test(value) }),
+body('gender').optional().isIn(["Male", "Female", "Other"]).withMessage("please pass valid gender value"),
+body('mobileNo', 'please pass your mobile no').optional().notEmpty().isMobilePhone(), body('email', 'please pass your email').optional().notEmpty().isEmail(),
+body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, async (req, res, next) => {
+    try {
+        const { name, dob, mobileNo, gender, email, otp } = req.body;
+
+        const userId = req.user._id
+        if (otp == undefined && (email == undefined || mobileNo == undefined)) {
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
+        }
+        let checkEmail = await userSchema.aggregate([
+            {
+                $match: {
+                    $or: [
+                        {
+                            $and: [
+                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+                                { email: email }
+                            ]
+                        },
+                        {
+                            $and: [
+                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+                                { mobileNo: mobileNo }
+                            ]
+                        }
+                    ]
+                }
+            }
+        ])
+        if (checkEmail.length > 0) {
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
+        }
+        let checkUser = await userSchema.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }]);
+        let updateUser = await userSchema.findByIdAndUpdate(userId, { gender: gender, name: name, birthDate: dob }, { new: true })
+
+        if (otp != undefined) {
+            if (otp == '000000') {
+                let update = await userSchema.findByIdAndUpdate(userId, { mobileNo: mobileNo, email: email }, { new: true });
+                update._doc['id'] = update._doc['_id'];
+                delete update._doc.updatedAt;
+                delete update._doc.createdAt;
+                delete update._doc._id;
+                delete update._doc.__v;
+                delete update._doc.paymentId;
+                delete update._doc.orderStatus;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update, status: 0 }, message: `details updated successfully` });
+            }
+            const startIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss')).tz('Asia/Kolkata'));
+            const endIs = (momentTz(moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(5, 'minutes')).tz('Asia/Kolkata'));
+            const timeIs = (momentTz().tz('Asia/Kolkata'));
+            // const startIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss');
+            // const endIs = moment(checkUser[0].generatedTime.join(' '), 'DD/MM/YYYY H:mm:ss').add(1, 'minutes');
+            // const timeIs = moment();
+            console.log(startIs)
+            if (timeIs >= startIs && timeIs <= endIs) {
+                //otp valid
+                if (checkUser[0].otp == otp) {
+                    let update = await userSchema.findByIdAndUpdate(userId, { mobileNo: mobileNo, email: email }, { new: true });
+                    update._doc['id'] = update._doc['_id'];
+                    delete update._doc.updatedAt;
+                    delete update._doc.createdAt;
+                    delete update._doc._id;
+                    delete update._doc.__v;
+                    delete update._doc.paymentId;
+                    delete update._doc.orderStatus;
+                    return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update, status: 0 }, message: `details updated successfully` });
+                }
+                else {
+                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, status: 2 }, message: `incorrect otp` });
+                }
+                console.log("valid")
+            }
+            else {
+                //otp expired
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
+            }
+
+        }
+        let getUser = await userSchema.findById(userId);
+        getUser._doc['id'] = getUser._doc['_id'];
+        delete getUser._doc.updatedAt;
+        delete getUser._doc.createdAt;
+        delete getUser._doc._id;
+        delete getUser._doc.__v;
+        delete getUser._doc.paymentId;
+        delete getUser._doc.orderStatus;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUser }, message: "user details updated" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 // router.post('/updateUser', authenticateToken, async (req, res, next) => {
 //     try {
 //         const { name, birthDate, mobileNo,gender, email, isVerify } = req.body;
@@ -382,61 +476,61 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
 //     }
 // })
 
-router.post('/updateUser', authenticateToken, [body('name', 'please pass valid name').optional().notEmpty().isString(),
-body('dob', "please pass dob").notEmpty().optional().custom((value) => { return regex.test(value) }),
-body('gender').optional().isIn(["Male", "Female", "Other"]).withMessage("please pass valid gender value"),
-body('mobileNo', 'please pass your mobile no').optional().notEmpty().isMobilePhone(), body('email', 'please pass your email').optional().notEmpty().isEmail(),
-body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, async (req, res, next) => {
-    try {
-        const { name, birthDate, mobileNo, gender, email, otp } = req.body;
+// router.post('/updateUser', authenticateToken, [body('name', 'please pass valid name').optional().notEmpty().isString(),
+// body('dob', "please pass dob").notEmpty().optional().custom((value) => { return regex.test(value) }),
+// body('gender').optional().isIn(["Male", "Female", "Other"]).withMessage("please pass valid gender value"),
+// body('mobileNo', 'please pass your mobile no').optional().notEmpty().isMobilePhone(), body('email', 'please pass your email').optional().notEmpty().isEmail(),
+// body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, async (req, res, next) => {
+//     try {
+//         const { name, birthDate, mobileNo, gender, email, otp } = req.body;
 
-        const userId = req.user._id
+//         const userId = req.user._id
 
-        let checkEmail = await userSchema.aggregate([
-            {
-                $match: {
-                    $or: [
-                        {
-                            $and: [
-                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                { email: email }
-                            ]
-                        },
-                        {
-                            $and: [
-                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                { mobileNo: mobileNo }
-                            ]
-                        }
-                    ]
-                }
-            }
-        ])
-        let updateUser = await userSchema.findByIdAndUpdate(userId, { email: email, gender: gender, name: name, mobileNo: mobileNo, birthDate: birthDate }, { new: true })
-        if (isVerify) {
-            if (email != undefined && validateEmail(email)) {
-                otp = getRandomIntInclusive(111111, 999999);
-                res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { email: updateUser.email }, otp: otp }, message: "user found" });
-                let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
-                let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
-                await main(checkExist[0].email, message);
-            }
-            else if (mobileNo != undefined && validatePhoneNumber(mobileNo)) {
-                otp = getRandomIntInclusive(111111, 999999);
-                res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { mobileNo: updateUser.mobileNo }, otp: otp }, message: "otp sent to mobile no" });
+//         let checkEmail = await userSchema.aggregate([
+//             {
+//                 $match: {
+//                     $or: [
+//                         {
+//                             $and: [
+//                                 { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+//                                 { email: email }
+//                             ]
+//                         },
+//                         {
+//                             $and: [
+//                                 { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+//                                 { mobileNo: mobileNo }
+//                             ]
+//                         }
+//                     ]
+//                 }
+//             }
+//         ])
+//         let updateUser = await userSchema.findByIdAndUpdate(userId, { email: email, gender: gender, name: name, mobileNo: mobileNo, birthDate: birthDate }, { new: true })
+//         if (isVerify) {
+//             if (email != undefined && validateEmail(email)) {
+//                 otp = getRandomIntInclusive(111111, 999999);
+//                 res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { email: updateUser.email }, otp: otp }, message: "user found" });
+//                 let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+//                 let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
+//                 await main(checkExist[0].email, message);
+//             }
+//             else if (mobileNo != undefined && validatePhoneNumber(mobileNo)) {
+//                 otp = getRandomIntInclusive(111111, 999999);
+//                 res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { mobileNo: updateUser.mobileNo }, otp: otp }, message: "otp sent to mobile no" });
 
-                console.log(otp);
-                let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
-                let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
-                await sendSms(countryCode + mobileNo, `Helllo User, Your otp for laundary service is ${otp} , Please Do not share this otp with anyone`);
+//                 console.log(otp);
+//                 let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+//                 let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
+//                 await sendSms(countryCode + mobileNo, `Helllo User, Your otp for laundary service is ${otp} , Please Do not share this otp with anyone`);
 
-            }
-        }
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { name: updateUser.name, birthDate: updateUser.birthDate } }, message: "user details updated" });
-    } catch (error) {
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
+//             }
+//         }
+//         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { name: updateUser.name, birthDate: updateUser.birthDate } }, message: "user details updated" });
+//     } catch (error) {
+//         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+//     }
+// })
 router.get('/getDetails', async (req, res, next) => {
     try {
         const { status } = req.query;
@@ -871,7 +965,10 @@ router.get('/address', authenticateToken, async (req, res, next) => {
         let getAddress = await addressSchema.aggregate([
             {
                 $match: {
-                    userId: mongoose.Types.ObjectId(userId)
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { isActive: true }
+                    ]
                 }
             },
             {
@@ -888,6 +985,44 @@ router.get('/address', authenticateToken, async (req, res, next) => {
         ]);
 
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        const { addressId } = req.body;
+
+        let getAddress = await addressSchema.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { _id: mongoose.Types.ObjectId(addressId) }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ]);
+
+        if (getAddress.length == 0) {
+            return res.status(getAddress.length > 0 ? 200 : 400).json({ issuccess: getAddress.length > 0 ? true : false, data: { acknowledgement: getAddress.length > 0 ? true : false, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
+        }
+        let updateAddress = await addressSchema.findByIdAndUpdate(addressId, { isActive: false }, { new: true });
+        return res.status(getAddress.length > 0 ? 200 : 400).json({ issuccess: getAddress.length > 0 ? true : false, data: { acknowledgement: getAddress.length > 0 ? true : false, data: getAddress }, message: getAddress.length > 0 ? "address removed successfully" : "address not found" });
 
     } catch (error) {
         console.log(error.message);

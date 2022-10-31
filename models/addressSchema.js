@@ -49,6 +49,10 @@ const addressSchema = mongoose.Schema({
     userId: {
         type: mongoose.Types.ObjectId,
         ref: "users"
+    },
+    isActive: {
+        type: Boolean,
+        default: true
     }
 }, { timestamps: true });
 
