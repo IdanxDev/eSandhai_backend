@@ -9,6 +9,7 @@ const userSchema = require('../models/userModel');
 const { getCurrentDateTime24 } = require('../utility/dates');
 const bcrypt = require('bcrypt')
 const { main } = require('../utility/mail');
+const userSubscription = require('../models/userSubscription')
 const { check, body, oneOf } = require('express-validator')
 const { sendSms } = require('../utility/sendSms');
 const { getPlaces, placeFilter, formatAddress } = require('../utility/mapbox')
@@ -25,6 +26,8 @@ const riderSchema = require('../models/riderSchema');
 const { query } = require('express');
 const proofSchema = require('../models/proofSchema');
 const timeSchema = require('../models/timeSchema');
+const holidaySchema = require('../models/holidaySchema');
+const activeDays = require('../models/activeDays');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -824,19 +827,26 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
     }
 })
 router.post('/addTimerange', authenticateToken, checkUserRole(['superAdmin']),
-    [body("start", "please provide start hours").notEmpty().isString(),
-    body('end', "please provide ending hours").notEmpty().isString(),
+    [body("start", "please provide start hours").notEmpty().isString().custom((value) => { return /^(\d{1,2})\:(\d{1,2})$/.test(value) }),
+    body('end', "please provide ending hours").notEmpty().isString().custom((value) => { return /^(\d{1,2})\:(\d{1,2})$/.test(value) }),
     body('isActive', "please provide valid active status field").optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            const { start, end, isActive } = req.body;
+            let { start, end, isActive } = req.body;
 
+            let startIs = start.split(":");
+            let endIs = end.split(":");
+            startIs = startIs.map((value) => { console.log(value); if (value.length == 1) { return "0" + value } return value })
+            endIs = endIs.map((value) => { console.log(value); if (value.length == 1) { return "0" + value } return value })
+            console.log(startIs);
+            console.log(endIs);
+            start = startIs.join(":")
+            end = endIs.join(":")
             let checkCategory = await timeSchema.findOne({ start: start, end: end });
 
             if (checkCategory != undefined || checkCategory != null) {
                 return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${start} ${end} already registered` });
             }
-
             let addCategory = new timeSchema({
                 start: start,
                 end: end,
@@ -951,6 +961,136 @@ router.get('/getTimerange', authenticateToken, async (req, res) => {
             }
         ])
         return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: getUsers.length > 0 ? true : false, data: getUsers }, message: getUsers.length > 0 ? `time range found` : "no any time range found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/addHoliday', authenticateToken, checkUserRole(['superAdmin']),
+    [body("date", "please provide date").notEmpty().isString().custom((value) => { return regex.test(value) }),
+    body('timeSlots', "please provide timeSlot Values").optional().isArray({ min: 1 }),
+    body('isFullHoliday', 'please provide fullholiday field value').optional().isBoolean(),
+    ], checkErr, async (req, res) => {
+        try {
+            let { date, timeSlots, isFullHoliday } = req.body;
+
+            if ('isFullHoliday' in req.body && isFullHoliday == true) {
+                let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: false, time: { $concat: ["$start", " - ", "$end"] } } }]);
+                timeSlots = getTimeRange
+            }
+            else {
+                if (timeSlots == undefined || Array.isArray(timeSlots) == false || timeSlots.length == 0) {
+                    return res.status(400).json({ issuccess: false, data: { acknowledgement: false }, message: `please provide time slots` });
+                }
+            }
+
+            let checkCategory = await holidaySchema.findOne({ date });
+
+            if (checkCategory != undefined || checkCategory != null) {
+                let addCategory = await holidaySchema.findByIdAndUpdate(checkCategory._id, { date: date, timeSlots: timeSlots, isFullHoliday: isFullHoliday })
+                addCategory._doc['id'] = addCategory._doc['_id'];
+                delete addCategory._doc.updatedAt;
+                delete addCategory._doc.createdAt;
+                delete addCategory._doc._id;
+                delete addCategory._doc.__v;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${date} holiday successfully added` });
+            }
+
+            let addCategory = new holidaySchema({
+                date: date,
+                timeSlots: timeSlots,
+                isFullHoliday: isFullHoliday
+            })
+
+            await addCategory.save();
+            addCategory._doc['id'] = addCategory._doc['_id'];
+            delete addCategory._doc.updatedAt;
+            delete addCategory._doc.createdAt;
+            delete addCategory._doc._id;
+            delete addCategory._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${date} holiday successfully added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.delete('/removeHoliday', authenticateToken, checkUserRole(['superAdmin']),
+    [
+        body('holidayId', 'please pass valid holiday id').notEmpty().custom((value) => mongoose.Types.ObjectId.isValid(value))
+    ], checkErr, async (req, res) => {
+        try {
+            const { holidayId } = req.body;
+            let getRecord = await holidaySchema.findById(holidayId);
+            if (getRecord != undefined && getRecord != null) {
+                let removeRecord = await holidaySchema.findByIdAndRemove(holidayId)
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: removeRecord }, message: "record removed successfully" })
+            }
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `holiday record not found` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.get('/getActiveDays', authenticateToken, checkUserRole(['superAdmin']), async (req, res) => {
+    try {
+        const { date } = req.query;
+        let getHoliday = await holidaySchema.findOne({ date: date });
+        console.log(getHoliday);
+        if (getHoliday != null && getHoliday != undefined) {
+            let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
+            console.log(checkExist);
+            if (checkExist.length > 0) {
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+            }
+            let addDay = new activeDays({ date: getHoliday.date, timeSlots: getHoliday.timeSlots, isFullHoliday: getHoliday.isFullHoliday });
+            await addDay.save();
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} status found` });
+        }
+        let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
+        if (checkExist.length > 0) {
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+        }
+        let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: true, time: { $concat: ["$start", " - ", "$end"] } } }]);
+        let addDay = new activeDays({ date: date, timeSlots: getTimeRange });
+        await addDay.save();
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} holiday successfully added` });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getHoliday', authenticateToken, checkUserRole(['superAdmin']), async (req, res) => {
+    try {
+        let anotherMatch = [];
+        if ('isFullHoliday' in req.query) {
+            anotherMatch.push({ isFullHoliday: req.query.isFullHoliday === 'true' })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getHoliday = await holidaySchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id",
+                    isHalf: { $cond: { if: { $eq: ["$isFullHoliday", true] }, then: false, else: true } }
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0
+                }
+            }
+        ])
+        return res.status(getHoliday.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: getHoliday.length > 0 ? true : false, data: getHoliday }, message: getHoliday.length > 0 ? "holiday details found" : "no any holiday scheduled" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
@@ -1133,162 +1273,6 @@ router.get('/getHelper', authenticateToken, async (req, res) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addTimeRange', authenticateToken, checkUserRole(['superAdmin']),
-    [body("title").isString().withMessage("please provide valid category name"),
-    body('description').optional().isString().withMessage("please provide valid description"),
-    body('categoryId', 'please provide category id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value)),
-    body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field")], checkErr, async (req, res) => {
-        try {
-            const { title, description, categoryId, isVisible } = req.body;
-            if (req.file == undefined || req.file.location == undefined) {
-                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please pass image field` });
-            }
-            let checkCategory = await helperSchema.findOne({ title: title, categoryId: mongoose.Types.ObjectId(categoryId) });
-            console.log(req.file);
-            if (checkCategory != undefined || checkCategory != null) {
-                removeObject(req.file.key)
-                return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${title} already registered` });
-            }
-
-            let addCategory = new helperSchema({
-                title: title,
-                icon: req.file != undefined ? req.file.location : "",
-                description: description,
-                categoryId: categoryId,
-                isVisible: isVisible
-            })
-
-            await addCategory.save();
-            addCategory._doc['id'] = addCategory._doc['_id'];
-            delete addCategory._doc.updatedAt;
-            delete addCategory._doc.createdAt;
-            delete addCategory._doc._id;
-            delete addCategory._doc.__v;
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `${title} successfully added` });
-        } catch (error) {
-            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-        }
-    })
-router.put('/updateTimeRange', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('helper').single('image'),
-    [body("title").optional().notEmpty().isString().withMessage("please provide valid category name"),
-    body('description').optional().isString().withMessage("please provide valid description"),
-    body('categoryId', 'please provide category id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value)),
-    body('isVisible').optional().isBoolean().withMessage("please provide valid visibility field"),
-    body('helperId', 'please provide helper id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value)),
-    ], checkErr, async (req, res) => {
-        try {
-            const { title, categoryId, description, helperId, isVisible } = req.body;
-
-            let checkCategory = await helperSchema.findById(helperId);
-            if (checkCategory == undefined || checkCategory == null) {
-                return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `helper not found` });
-            }
-            if ('title' in req.body) {
-                let checkName = await helperSchema.findOne({ title: title, categoryId: 'categoryId' in req.body ? categoryId : checkCategory.categoryId });
-                if (checkName != undefined && checkName != null && checkName._id.toString() != helperId) {
-                    return res.status(409).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `${title} already registered` });
-                }
-            }
-
-            let addCategory = {
-                title: title,
-                icon: req.file != undefined ? req.file.location : checkCategory.location,
-                isVisible: isVisible,
-                description: description,
-                categoryId: categoryId
-            }
-
-            if (req.file != undefined) {
-                let result = checkCategory.icon.indexOf("helper");
-                let key = checkCategory.icon.substring(result, checkCategory.icon.length)
-                if (key != undefined) {
-                    removeObject(key)
-                }
-            }
-            let update = await helperSchema.findByIdAndUpdate(categoryId, addCategory, { new: true });
-            if (update != undefined) {
-                update._doc['id'] = update._doc['_id'];
-                delete update._doc.updatedAt;
-                delete update._doc.createdAt;
-                delete update._doc._id;
-                delete update._doc.__v;
-            }
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `${update.name} successfully updated` });
-        } catch (error) {
-            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-        }
-    })
-router.get('/getTimeRange', authenticateToken, async (req, res) => {
-    try {
-        let match;
-        let anotherMatch = [];
-        if ('title' in req.query) {
-            let regEx = new RegExp(req.query.title, 'i')
-            anotherMatch.push({ title: { $regex: regEx } })
-        }
-        if ('isVisible' in req.query) {
-            anotherMatch.push({ isVisible: req.query.isVisible === 'true' })
-        }
-        if ('description' in req.query) {
-            let regEx = new RegExp(req.query.description, 'i')
-            anotherMatch.push({ description: { $regex: regEx } })
-        }
-        if ('categoryId' in req.query) {
-            anotherMatch.push({ categoryId: mongoose.Types.ObjectId(req.query.categoryId) })
-        }
-        console.log(anotherMatch);
-        if (anotherMatch.length > 0) {
-            match = {
-                $match: {
-                    $and: anotherMatch
-                }
-            }
-        }
-        else {
-            match = {
-                $match: {
-
-                }
-            }
-        }
-        let getUsers = await helperSchema.aggregate([
-            match,
-            {
-                $addFields: {
-                    "id": "$_id"
-                }
-            },
-
-            {
-                $lookup: {
-                    from: "categories",
-                    localField: "categoryId",
-                    foreignField: "_id",
-                    as: "categoryData"
-                }
-            },
-            {
-                $addFields: {
-                    categoryName: {
-                        $cond: {
-                            if: { $gt: [{ $size: "$categoryData" }, 0] }, then: { $first: "$categoryData.name" }, else: ""
-                        }
-                    }
-                }
-            },
-            {
-                $project: {
-                    _id: 0,
-                    __v: 0,
-                    categoryData: 0
-                }
-            }
-        ])
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `time rage found` : "no any time range found" });
-    } catch (error) {
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
 router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('items').single('image'),
     [body("name", 'please provide valid category name').isString(),
     body('description', 'please provide valid description').optional().isString(),
@@ -1446,6 +1430,7 @@ router.put('/updateItems', authenticateToken, checkUserRole(['superAdmin']), upl
     })
 router.get('/getItems', authenticateToken, async (req, res) => {
     try {
+        const userId = req.user._id;
         let match;
         let anotherMatch = [];
         if ('name' in req.query) {
@@ -1461,6 +1446,7 @@ router.get('/getItems', authenticateToken, async (req, res) => {
         }
         if ('categoryId' in req.query) {
             anotherMatch.push({ categoryId: mongoose.Types.ObjectId(req.query.categoryId) })
+            let checkSubscription = await userSubscription.aggregate([{ $project: { pendingPickUp: { $sum: "$pickup" }, pendingDelivery: { $sum: "$delivery" } } }])
         }
         if ('isBag' in req.query) {
             anotherMatch.push({ isBag: req.query.isBag === 'true' })

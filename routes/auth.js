@@ -842,7 +842,7 @@ router.get('/getUsers', async (req, res) => {
             }
         }
     ])
-    return res.status(410).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
+    return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
 })
 
 router.get('/refresh', generateRefreshToken);
@@ -962,6 +962,7 @@ router.put('/updateAddress', authenticateToken, async (req, res, next) => {
 router.get('/address', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
+        console.log(userId)
         let getAddress = await addressSchema.aggregate([
             {
                 $match: {
@@ -1030,6 +1031,37 @@ router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
     }
 })
 router.post('/addSubscription', authenticateToken, async (req, res, next) => {
+    try {
+        const { planId } = req.body;
+        const userId = req.user._id;
+        let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
+        }
+        let createAddress = new userSubscription({
+            planId: planId,
+            userId: userId,
+            pickup: checkCategory.pickup,
+            delivery: checkCategory.delivery,
+        })
+
+        await createAddress.save();
+        createAddress._doc['id'] = createAddress._doc['_id'];
+        delete createAddress._doc.updatedAt;
+        delete createAddress._doc.createdAt;
+        delete createAddress._doc._id;
+        delete createAddress._doc.__v;
+        delete createAddress._doc.paymentId;
+        delete createAddress._doc.orderStatus;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user subscription added" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => {
     try {
         const { planId } = req.body;
         const userId = req.user._id;

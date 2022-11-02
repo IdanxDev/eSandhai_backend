@@ -5,6 +5,10 @@ const userSubscription = mongoose.Schema({
         type: mongoose.Types.ObjectId,
         ref: "users"
     },
+    orderId: {
+        type: String,
+        default: ""
+    },
     planId: {
         type: mongoose.Types.ObjectId,
         ref: "subscription"
@@ -24,7 +28,7 @@ const userSubscription = mongoose.Schema({
     //0==pending
     //1==paid
     //2==expired
-    orderStatus: {
+    status: {
         type: Number,
         default: 0
     }
