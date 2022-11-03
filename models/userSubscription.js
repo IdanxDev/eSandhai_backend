@@ -26,7 +26,7 @@ const userSubscription = mongoose.Schema({
         default: ""
     },
     //0==pending
-    //1==paid
+    //1==paid/active
     //2==expired
     status: {
         type: Number,

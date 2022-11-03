@@ -34,9 +34,13 @@ body('name').isString().withMessage("please pass name"),
 body('role').isIn(["superAdmin", "admin", "employee"]).withMessage("please pass valid role"),
 body('gender').isIn(["Male", "Female", "Other"]).withMessage("please pass valid gender value"),
 body('dob').custom((value) => { return regex.test(value) }).withMessage("please pass dob"),
-body('mobileNo').isMobilePhone().withMessage("please pass mobile no")], checkErr, async (req, res, next) => {
+body('mobileNo').isMobilePhone().withMessage("please pass mobile no"),
+body('alternativeMobile').optional().isMobilePhone().withMessage("please pass mobile no"),
+body('fatherName', 'please pass valid father name').optional().notEmpty().isString(),
+body('bloodGroup', 'please pass valid blood group detail').optional().notEmpty().isString()
+], checkErr, async (req, res, next) => {
     try {
-        const { name, gender, dob, mobileNo, countryCode, role, email } = req.body;
+        const { name, gender, dob, mobileNo, countryCode, fatherName, alternativeMobile, bloodGroup, role, email } = req.body;
 
         let checkExist = await adminSchema.aggregate([
             {
@@ -67,6 +71,9 @@ body('mobileNo').isMobilePhone().withMessage("please pass mobile no")], checkErr
             name: name,
             gender: gender,
             dob: dob,
+            fatherName: fatherName,
+            bloodGroup: bloodGroup,
+            alternativeMobile: alternativeMobile,
             countryCode: countryCode,
             password: randomstring,
             role: role
@@ -158,6 +165,37 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: error.message || "Having issue is server" })
     }
 })
+router.put('/updateInternalEmployee', authenticateToken, checkUserRole(['superAdmin']),
+    [check('name', 'please pass valid name').optional().notEmpty().isString().withMessage("please pass valid name"),
+    body('role').isIn(["superAdmin", "admin", "employee"]).optional().withMessage("please pass valid role"),
+    body('gender').isIn(["Male", "Female", "Other"]).optional().withMessage("please pass valid gender value"),
+    body('birthDate').optional().custom((value) => { return regex.test(value) }).withMessage("please pass dob"),
+    body('alternativeMobile').optional().isMobilePhone().withMessage("please pass mobile no"),
+    body('fatherName', 'please pass valid father name').optional().notEmpty().isString(),
+    body('bloodGroup', 'please pass valid blood group detail').optional().notEmpty().isString(),
+    body('userId', 'please pass valid user id').notEmpty().isString().custom((value) => mongoose.Types.ObjectId.isValid(value))
+    ], checkErr, async (req, res, next) => {
+        try {
+            const { name, birthDate, gender, fatherName, alternativeMobile, bloodGroup, userId } = req.body;
+
+            const checkExist = await adminSchema.findById(userId);
+            if (checkExist == null || checkExist == undefined) {
+                return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "user not found" });
+            }
+            let updateUser = await adminSchema.findByIdAndUpdate(userId, req.body, { new: true });
+            updateUser._doc['id'] = updateUser._doc['_id'];
+            delete updateUser._doc.updatedAt;
+            delete updateUser._doc.createdAt;
+            delete updateUser._doc._id;
+            delete updateUser._doc.__v;
+            delete updateUser._doc.generatedTime;
+            delete updateUser._doc.otp
+
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser }, message: "user details updated" });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
 router.post('/updateProfile', authenticateToken, [check('name', 'please pass valid name').optional().notEmpty().isString().withMessage("please pass valid name"),
 check('birthDate', 'please pass valid date').optional().notEmpty().trim().custom((value) => { return /^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[13-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$/.test(value) }).withMessage("please pass valid date"),
 check('mobileNo', 'please pass valid mobile no').optional().notEmpty().isMobilePhone().withMessage("please pass valid mobile no"),
@@ -531,6 +569,9 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
         if ('role' in req.query) {
             anotherMatch.push({ role: req.query.role })
         }
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
         if (userId != undefined) {
             anotherMatch.push({
                 _id: mongoose.Types.ObjectId(userId)
@@ -595,6 +636,79 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
         }
         if ('role' in req.query) {
             anotherMatch.push({ role: req.query.role })
+        }
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if (userId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(userId)
+            })
+        }
+        console.log(anotherMatch);
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await adminSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            },
+            {
+                $addFields: {
+                    country: "Usa",
+                    mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+                    email: { $ifNull: ["$email", "Unspecified"] },
+                    status: { $ifNull: ["$status", 0] }
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getRiders', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    try {
+        const { userId } = req.body;
+        let match;
+        let anotherMatch = [];
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('role' in req.query) {
+            anotherMatch.push({ role: req.query.role })
+        }
+        if ('activeStatus' in req.query) {
+            anotherMatch.push({ activeStatus: req.query.activeStatus });
+        }
+        if ('jobStatus' in req.query) {
+            anotherMatch.push({ jobStatus: req.query.jobStatus === 'true' });
         }
         if (userId != undefined) {
             anotherMatch.push({
@@ -974,7 +1088,7 @@ router.post('/addHoliday', authenticateToken, checkUserRole(['superAdmin']),
             let { date, timeSlots, isFullHoliday } = req.body;
 
             if ('isFullHoliday' in req.body && isFullHoliday == true) {
-                let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: false, time: { $concat: ["$start", " - ", "$end"] } } }]);
+                let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: false, time: { $concat: ["$start", "-", "$end"] } } }]);
                 timeSlots = getTimeRange
             }
             else {
@@ -1684,6 +1798,9 @@ body('jobStatus', 'please enter valid status').optional().isBoolean(),
 body('activeStatus', 'please enter valid active status').optional().isNumeric(),
 body('insurance', 'please enter insurance active or not').optional().isBoolean(),
 body('riderInsurance', 'please enter rider insurance number').optional().notEmpty().isString(),
+body('alternativeMobile').optional().isMobilePhone().withMessage("please pass mobile no"),
+body('fatherName', 'please pass valid father name').optional().notEmpty().isString(),
+body('bloodGroup', 'please pass valid blood group details').optional().notEmpty().isString(),
 body('riderExpiry', 'please enter rider expiry number').optional().notEmpty().custom((value) => { return regex.test(value) }),
 body('riderId', 'please enter valid rider id').notEmpty().custom((value) => mongoose.Types.ObjectId.isValid(value))
 ], checkErr, async (req, res, next) => {
@@ -1696,7 +1813,9 @@ body('riderId', 'please enter valid rider id').notEmpty().custom((value) => mong
             fatherName,
             insurance,
             riderInsurance,
-            riderExpiry
+            riderExpiry,
+            bloodGroup,
+            alternativeMobile,
         } = req.body;
 
         const userId = req.body.riderId
@@ -1720,6 +1839,8 @@ body('riderId', 'please enter valid rider id').notEmpty().custom((value) => mong
             activeStatus: activeStatus,
             fatherName: fatherName,
             insurance: insurance,
+            alternativeMobile: alternativeMobile,
+            bloodGroup: bloodGroup,
             riderInsurance: riderInsurance,
             riderExpiry: riderExpiry,
             image: req.file != undefined && req.file.location != undefined ? req.file.location : checkUser.image
@@ -1952,10 +2073,10 @@ router.get('/getRiderVehicle', authenticateToken, checkUserRole(["superAdmin"]),
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
-router.get('/getRiderProof', authenticateToken, checkUserRole(["superAdmin"]), [
-    check('riderId', 'please enter rider id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
+router.get('/getProof', authenticateToken, checkUserRole(["superAdmin"]), [
+    check('userId', 'please enter user id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
         try {
-            const userId = req.query.riderId;
+            const userId = req.query.userId;
             let checkUser = await proofSchema.aggregate([
                 {
                     $match: {
@@ -1980,7 +2101,7 @@ router.get('/getRiderProof', authenticateToken, checkUserRole(["superAdmin"]), [
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
-router.delete('/removeRiderProof', authenticateToken, checkUserRole(["superAdmin"]), [
+router.delete('/removeProof', authenticateToken, checkUserRole(["superAdmin"]), [
     check('proofId', 'please enter proof id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res, next) => {
         try {
             const userId = req.query.proofId;
@@ -2001,22 +2122,22 @@ router.delete('/removeRiderProof', authenticateToken, checkUserRole(["superAdmin
     })
 router.post('/addProof', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('proof').single('image'),
     [body('title').notEmpty().isString().withMessage("please pass subscription name"),
-    body('riderId', 'please enter rider id').custom((value) => mongoose.Types.ObjectId.isValid(value)),
+    body('userId', 'please enter user id').custom((value) => mongoose.Types.ObjectId.isValid(value)),
     body('isVerified').optional().isBoolean().withMessage("please pass boolean for visibility"),
     ]
     , checkErr, async (req, res) => {
         try {
-            const { riderId, title, isVerified } = req.body;
+            const { userId, title, isVerified } = req.body;
             if (req.file == undefined || req.file.location == undefined) {
                 return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please upload icon image` });
             }
-            let checkProof = await proofSchema.findOne({ userId: riderId, title: title });
+            let checkProof = await proofSchema.findOne({ userId: userId, title: title });
             if (checkProof != undefined && checkProof != null) {
                 return res.status(403).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `proof already exist` });
             }
             let addProof = new proofSchema({
                 title: title,
-                userId: riderId,
+                userId: userId,
                 isVerified: isVerified,
                 image: req.file != undefined ? req.file.location : ""
             })
@@ -2026,6 +2147,31 @@ router.post('/addProof', authenticateToken, checkUserRole(['superAdmin']), uploa
             delete addProof._doc.createdAt;
             delete addProof._doc._id;
             delete addProof._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addProof }, message: `${title} proof added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+router.put('/updateProof', authenticateToken, checkUserRole(['superAdmin']),
+    [
+        body('isVerified').optional().isBoolean().withMessage("please pass boolean for visibility"),
+        body('proofId', 'please pass valid proof id').notEmpty().custom((value) => mongoose.Types.ObjectId.isValid(value))
+    ]
+    , checkErr, async (req, res) => {
+        try {
+            const { proofId, isVerified } = req.body;
+            let checkProof = await proofSchema.findById(proofId);
+            if (checkProof == undefined || checkProof == null) {
+                return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `no proof found` });
+            }
+            let removeProof = await proofSchema.findByIdAndUpdate(proofId, { isVerified: isVerified }, { new: true });
+            removeProof._doc['id'] = removeProof._doc['_id'];
+            delete removeProof._doc.updatedAt;
+            delete removeProof._doc.createdAt;
+            delete removeProof._doc._id;
+            delete removeProof._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: removeProof }, message: 'proof updated' });
+
             return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addProof }, message: `${title} proof added` });
         } catch (error) {
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })

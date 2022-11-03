@@ -11,7 +11,7 @@ const { check, body, oneOf } = require('express-validator')
 const { main } = require('../utility/mail')
 const { sendSms } = require('../utility/sendSms');
 const { getPlaces, placeFilter, formatAddress } = require('../utility/mapbox')
-const { generateAccessToken, authenticateToken, generateRefreshToken } = require('../middleware/auth');
+const { generateAccessToken, authenticateToken, generateRefreshToken, checkUserRole } = require('../middleware/auth');
 const addressSchema = require('../models/addressSchema');
 const { checkErr } = require('../utility/error');
 const userSubscription = require('../models/userSubscription');
@@ -834,17 +834,130 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.get('/getUsers', async (req, res) => {
+router.get('/getUsers', authenticateToken, checkUserRole(['superAdmin']), async (req, res) => {
     let getUsers = await userSchema.aggregate([
         {
             $match: {
 
             }
+        },
+        {
+            $addFields: {
+                id: "$_id",
+                delivery: 0,
+                pickup: 0
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                __v: 0,
+                generatedTime: 0,
+                otp: 0,
+                createdAt: 0,
+                updatedAt: 0
+            }
         }
     ])
     return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
 })
+router.get('/getUserAddress', authenticateToken, checkUserRole(['superAdmin']), async (req, res, next) => {
+    try {
+        const userId = req.query.id
+        console.log(userId)
+        let getAddress = await addressSchema.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { isActive: true }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ]);
 
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getUserSubscription', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.query.id
+        let getAddress = await userSubscription.aggregate([
+            {
+                $match: {
+                    userId: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $lookup: {
+                    from: "subscriptions",
+                    let: { id: "$planId" },
+                    pipeline: [{
+                        $match: {
+                            $expr: {
+                                $eq: ["$_id", "$$id"]
+                            }
+                        }
+                    },
+                    {
+                        $addFields: {
+                            "id": "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            __v: 0,
+                            isVisible: 0,
+                            createdAt: 0,
+                            updatedAt: 0
+                        }
+                    }],
+                    as: "planDetails"
+                }
+            },
+            {
+                $addFields: {
+                    planDetails: { $first: "$planDetails" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ]);
+
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "subscription found" : "subscription not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/refresh', generateRefreshToken);
 
 router.get('/getSuggestions', async (req, res, next) => {
@@ -1175,7 +1288,7 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
             }
         ]);
 
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "subscription found" : "subscription not found" });
 
     } catch (error) {
         console.log(error.message);

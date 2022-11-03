@@ -31,9 +31,13 @@ body('role').optional().isIn(["rider"]).withMessage("please pass valid role"),
 body('gender').isIn(["Male", "Female", "Other"]).withMessage("please pass valid gender value"),
 body('dob').custom((value) => { return regex.test(value) }).withMessage("please pass dob"),
 body('countryCode', 'please pass valid country code').notEmpty().custom((value) => { return value.startsWith("+") }),
-body('mobileNo').isMobilePhone().withMessage("please pass mobile no")], checkErr, async (req, res, next) => {
+body('mobileNo').isMobilePhone().withMessage("please pass mobile no"),
+body('alternativeMobile').optional().isMobilePhone().withMessage("please pass mobile no"),
+body('fatherName', 'please pass valid father name').optional().notEmpty().isString(),
+body('bloodGroup', 'please pass valid blood group').optional().notEmpty().isString()
+], checkErr, async (req, res, next) => {
     try {
-        const { name, gender, dob, role, mobileNo, countryCode, email } = req.body;
+        const { name, gender, dob, role, mobileNo, countryCode, email, alternativeMobile, fatherName, bloodGroup } = req.body;
 
         let checkExist = await riderSchema.aggregate([
             {
@@ -66,6 +70,9 @@ body('mobileNo').isMobilePhone().withMessage("please pass mobile no")], checkErr
             dob: dob,
             countryCode: countryCode,
             username: randomstring,
+            fatherName: fatherName,
+            bloodGroup: bloodGroup,
+            alternativeMobile: alternativeMobile,
             role: role
         });
 
@@ -498,30 +505,74 @@ router.put('/updateWithOtp', authenticateToken, [oneOf([body('id').isEmail(), bo
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.get('/getUsers', authenticateToken, checkUserRole(["superAdmin", "admin"]), async (req, res) => {
-    let getUsers = await riderSchema.aggregate([
-        {
-            $match: {
-
-            }
-        },
-        {
-            $addFields: {
-                "id": "$_id"
-            }
-        },
-        {
-            $project: {
-                _id: 0,
-                __v: 0,
-                generatedTime: 0,
-                otp: 0,
-                createdAt: 0,
-                updatedAt: 0
+router.get('/getUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    try {
+        const { userId } = req.body;
+        let match;
+        let anotherMatch = [];
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('role' in req.query) {
+            anotherMatch.push({ role: req.query.role })
+        }
+        if ('activeStatus' in req.query) {
+            anotherMatch.push({ activeStatus: parseInt(req.query.activeStatus) });
+        }
+        if ('jobStatus' in req.query) {
+            anotherMatch.push({ jobStatus: req.query.jobStatus === 'true' });
+        }
+        if (userId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(userId)
+            })
+        }
+        console.log(anotherMatch);
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
             }
         }
-    ])
-    return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await riderSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            },
+            {
+                $addFields: {
+                    country: "Usa",
+                    mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+                    email: { $ifNull: ["$email", "Unspecified"] }
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
 })
 
 router.get('/refresh', generateRefreshToken);

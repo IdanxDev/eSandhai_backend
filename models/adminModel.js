@@ -35,6 +35,20 @@ const adminSchema = mongoose.Schema({
     generatedTime: [String],
     countryCode: String,
     birthDate: String,
+    fatherName: {
+        type: String,
+        default: ""
+    },
+    bloodGroup: {
+        type: String,
+        default: ""
+    },
+    alternativeMobile: {
+        type: String,
+        default: ""
+    },
+    //0==active
+    //1==inactive
     status: {
         type: Number,
         default: 0

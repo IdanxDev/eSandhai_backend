@@ -44,6 +44,14 @@ const riderSchema = mongoose.Schema({
         type: Boolean,
         default: false
     },
+    bloodGroup: {
+        type: String,
+        default: ""
+    },
+    alternativeMobile: {
+        type: String,
+        default: ""
+    },
     //0==on
     //1==leave
     //2==removed
