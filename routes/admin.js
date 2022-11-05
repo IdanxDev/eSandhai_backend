@@ -692,6 +692,252 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/invoiceList', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    try {
+        let invoiceList = [{
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560'
+            , 'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'isSubscribed': true
+            , 'paymentStatus': 0
+            , 'invoiceStatus': 1
+            , 'amount': 2000
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }, {
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560'
+            , 'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'isSubscribed': true
+            , 'paymentStatus': 1
+            , 'invoiceStatus': 0
+            , 'amount': 5000
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }, {
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560'
+            , 'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'isSubscribed': true
+            , 'paymentStatus': 0
+            , 'invoiceStatus': 3
+            , 'amount': 2000
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }, {
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560'
+            , 'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'isSubscribed': true
+            , 'paymentStatus': 0
+            , 'invoiceStatus': 1
+            , 'amount': 4400
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }, {
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560'
+            , 'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'isSubscribed': true
+            , 'paymentStatus': 0
+            , 'invoiceStatus': 1
+            , 'amount': 3000
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }]
+        // const { userId } = req.body;
+        // let match;
+        // let anotherMatch = [];
+        // if ('name' in req.query) {
+        //     let regEx = new RegExp(req.query.name, 'i')
+        //     anotherMatch.push({ name: { $regex: regEx } })
+        // }
+        // if ('role' in req.query) {
+        //     anotherMatch.push({ role: req.query.role })
+        // }
+        // if ('status' in req.query) {
+        //     anotherMatch.push({ status: parseInt(req.query.status) });
+        // }
+        // if (userId != undefined) {
+        //     anotherMatch.push({
+        //         _id: mongoose.Types.ObjectId(userId)
+        //     })
+        // }
+        // console.log(anotherMatch);
+        // if (anotherMatch.length > 0) {
+        //     match = {
+        //         $match: {
+        //             $and: anotherMatch
+        //         }
+        //     }
+        // }
+        // else {
+        //     match = {
+        //         $match: {
+
+        //         }
+        //     }
+        // }
+        // let getUsers = await adminSchema.aggregate([
+        //     match,
+        //     {
+        //         $addFields: {
+        //             id: "$_id"
+        //         }
+        //     },
+        //     {
+        //         $project: {
+        //             __v: 0,
+        //             _id: 0,
+        //             password: 0,
+        //             otp: 0,
+        //             generatedTime: 0,
+        //             createdAt: 0,
+        //             updatedAt: 0
+        //         }
+        //     },
+        //     {
+        //         $addFields: {
+        //             country: "Usa",
+        //             mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+        //             email: { $ifNull: ["$email", "Unspecified"] },
+        //             status: { $ifNull: ["$status", 0] }
+        //         }
+        //     }
+        // ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: invoiceList }, message: invoiceList.length > 0 ? `invoice found` : "no invoice found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/paymentList', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    try {
+        let invoiceList = [{
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560',
+            'paymentId': 'paymentId',
+            'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'paymentStatus': 0,
+            'isOnline': true,
+            'amount': 2000
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }, {
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560',
+            'paymentId': 'paymentId',
+            'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'paymentStatus': 1,
+            'isOnline': false,
+            'amount': 3300
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }, {
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560',
+            'paymentId': 'paymentId',
+            'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'paymentStatus': 2,
+            'isOnline': true,
+            'amount': 4500
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }, {
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560',
+            'paymentId': 'paymentId',
+            'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'paymentStatus': 0,
+            'isOnline': true,
+            'amount': 3002
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }, {
+            'id': '632e886fc7d5ed3d874a80a2',
+            'invoiceId': '1234560',
+            'paymentId': 'paymentId',
+            'name': 'name'
+            , 'userId': '632e886fc7d5ed3d874a80a2'
+            , 'paymentStatus': 0,
+            'isOnline': true,
+            'amount': 8500
+            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+        }]
+        // const { userId } = req.body;
+        // let match;
+        // let anotherMatch = [];
+        // if ('name' in req.query) {
+        //     let regEx = new RegExp(req.query.name, 'i')
+        //     anotherMatch.push({ name: { $regex: regEx } })
+        // }
+        // if ('role' in req.query) {
+        //     anotherMatch.push({ role: req.query.role })
+        // }
+        // if ('status' in req.query) {
+        //     anotherMatch.push({ status: parseInt(req.query.status) });
+        // }
+        // if (userId != undefined) {
+        //     anotherMatch.push({
+        //         _id: mongoose.Types.ObjectId(userId)
+        //     })
+        // }
+        // console.log(anotherMatch);
+        // if (anotherMatch.length > 0) {
+        //     match = {
+        //         $match: {
+        //             $and: anotherMatch
+        //         }
+        //     }
+        // }
+        // else {
+        //     match = {
+        //         $match: {
+
+        //         }
+        //     }
+        // }
+        // let getUsers = await adminSchema.aggregate([
+        //     match,
+        //     {
+        //         $addFields: {
+        //             id: "$_id"
+        //         }
+        //     },
+        //     {
+        //         $project: {
+        //             __v: 0,
+        //             _id: 0,
+        //             password: 0,
+        //             otp: 0,
+        //             generatedTime: 0,
+        //             createdAt: 0,
+        //             updatedAt: 0
+        //         }
+        //     },
+        //     {
+        //         $addFields: {
+        //             country: "Usa",
+        //             mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+        //             email: { $ifNull: ["$email", "Unspecified"] },
+        //             status: { $ifNull: ["$status", 0] }
+        //         }
+        //     }
+        // ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: invoiceList }, message: invoiceList.length > 0 ? `payment found` : "no payments found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getRiders', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     try {
         const { userId } = req.body;

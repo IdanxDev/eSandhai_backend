@@ -7,6 +7,8 @@ const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
 const { getCurrentDateTime24 } = require('../utility/dates');
 const nodemailer = require("nodemailer");
+var admin = require('../utility/setup/firebase-admin');
+const { getAuth } = require("firebase-admin/auth");
 const { check, body, oneOf } = require('express-validator')
 const { main } = require('../utility/mail')
 const { sendSms } = require('../utility/sendSms');
@@ -16,6 +18,7 @@ const addressSchema = require('../models/addressSchema');
 const { checkErr } = require('../utility/error');
 const userSubscription = require('../models/userSubscription');
 const subscriptionSchema = require('../models/subscriptionSchema');
+const bodySchema = require('../models/bodySchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -120,84 +123,84 @@ router.post('/signUpWithGoogle', async (req, res, next) => {
     try {
         // console.log(req.body)
         const { idToken } = req.body;
-        let addData = new bodySchema({
-            data: req.body
-        });
-
-        await addData.save();
         if (idToken == undefined) {
-            return res.status(401).json({ isSuccess: false, data: null, message: "please check id token in request" });
+            return res.status(401).json({ issuccess: false, data: null, message: "please check id token in request" });
         }
-        let checkRevoked = true;
-        getAuth()
-            .verifyIdToken(idToken, checkRevoked)
-            .then(async (payload) => {
-                // console.log(payload)
-                console.log("token is valid in payload")
-                // Token is valid.
-                const { name, email, password, mobileNo, role } = payload;
-                // console.log(email.toString())
-                let checkExist = await userSchema.aggregate([
-                    {
-                        $match: {
-                            email: email
-                        }
-                    }
-                ]);
-                // console.log(checkExist);
-                if (checkExist.length > 0) {
-                    let user = {
-                        _id: checkExist[0]._id,
-                        timestamp: Date.now()
-                    }
+        await new bodySchema({
+            token: idToken
+        }).save()
+        return res.status(200).json({ issuccess: true, data: null, message: "done" });
 
-                    const { generatedToken, refreshToken } = await generateAccessToken(user);
-                    return res.status(200).json({ isSuccess: true, data: { user: { email: checkExist[0].email, name: checkExist[0].name, id: checkExist[0]._id, role: checkExist[0].role }, token: generatedToken, refreshToken: refreshToken }, message: "user successully found" });
-                }
+        // let checkRevoked = true;
+        // getAuth()
+        //     .verifyIdToken(idToken, checkRevoked)
+        //     .then(async (payload) => {
+        //         // console.log(payload)
+        //         console.log("token is valid in payload")
+        //         // Token is valid.
+        //         const { name, email, password, mobileNo, role } = payload;
+        //         // console.log(email.toString())
+        //         let checkExist = await userSchema.aggregate([
+        //             {
+        //                 $match: {
+        //                     email: email
+        //                 }
+        //             }
+        //         ]);
+        //         // console.log(checkExist);
+        //         if (checkExist.length > 0) {
+        //             let user = {
+        //                 _id: checkExist[0]._id,
+        //                 timestamp: Date.now()
+        //             }
 
-                // const userLoginIs = new userLogin({
-                //   userName: userName,
-                //   password: password
-                // });
+        //             const { generatedToken, refreshToken } = await generateAccessToken(user);
+        //             return res.status(200).json({ isSuccess: true, data: { user: { email: checkExist[0].email, name: checkExist[0].name, id: checkExist[0]._id, role: checkExist[0].role }, token: generatedToken, refreshToken: refreshToken }, message: "user successully found" });
+        //         }
 
-                // await userLoginIs.save();
+        //         // const userLoginIs = new userLogin({
+        //         //   userName: userName,
+        //         //   password: password
+        //         // });
 
-                const userIs = new userSchema({
-                    name: name,
-                    email: email,
-                    mobileNo: mobileNo,
-                    role: "user",
-                    password: password
-                });
+        //         // await userLoginIs.save();
 
-                await userIs.save();
-                // console.log(userIs)
-                let user = {
-                    _id: userIs._id,
-                    role: "user",
-                    timestamp: Date.now()
-                }
-                const { generatedToken, refreshToken } = await generateAccessToken(user);
-                return res.status(200).json({
-                    isSuccess: true, data: {
-                        user: {
-                            email: userIs.email, name: userIs.name, id: userIs._id, role: userIs.role
-                        }, token: generatedToken, refreshToken: refreshToken
-                    }, message: "user successfully signed up"
-                });
-            })
-            .catch((error) => {
-                console.log(error.message)
-                if (error.code == 'auth/id-token-revoked') {
-                    console.log("token is revoked")
-                    return res.status(401).json({ isSuccess: false, data: null, message: "user revoked app permissions" });
-                    // Token has been revoked   . Inform the user to reauthenticate or signOut() the user.
-                } else {
-                    console.log("token is invalid")
-                    return res.status(401).json({ isSuccess: false, data: null, message: "invalid token" });
-                    // Token is invalid.
-                }
-            });
+        //         const userIs = new userSchema({
+        //             name: name,
+        //             email: email,
+        //             mobileNo: mobileNo,
+        //             role: "user",
+        //             password: password
+        //         });
+
+        //         await userIs.save();
+        //         // console.log(userIs)
+        //         let user = {
+        //             _id: userIs._id,
+        //             role: "user",
+        //             timestamp: Date.now()
+        //         }
+        //         const { generatedToken, refreshToken } = await generateAccessToken(user);
+        //         return res.status(200).json({
+        //             isSuccess: true, data: {
+        //                 user: {
+        //                     email: userIs.email, name: userIs.name, id: userIs._id, role: userIs.role
+        //                 }, token: generatedToken, refreshToken: refreshToken
+        //             }, message: "user successfully signed up"
+        //         });
+        //     })
+        //     .catch((error) => {
+        //         console.log(error.message)
+        //         if (error.code == 'auth/id-token-revoked') {
+        //             console.log("token is revoked")
+        //             return res.status(401).json({ isSuccess: false, data: null, message: "user revoked app permissions" });
+        //             // Token has been revoked   . Inform the user to reauthenticate or signOut() the user.
+        //         } else {
+        //             console.log("token is invalid")
+        //             return res.status(401).json({ isSuccess: false, data: null, message: "invalid token" });
+        //             // Token is invalid.
+        //         }
+        //     });
 
 
 
