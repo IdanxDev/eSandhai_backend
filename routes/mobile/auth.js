@@ -319,7 +319,7 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
         }
         let checkUser = await userSchema.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }]);
-        let updateUser = await userSchema.findByIdAndUpdate(userId, { gender: gender, name: name, birthDate: dob }, { new: true })
+        let updateUser = await userSchema.findByIdAndUpdate(userId, { gender: gender, name: name, dob: dob }, { new: true })
 
         if (otp != undefined) {
             if (otp == '000000') {

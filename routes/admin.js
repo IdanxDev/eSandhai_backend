@@ -938,6 +938,7 @@ router.get('/paymentList', authenticateToken, checkUserRole(['superAdmin', 'admi
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+
 router.get('/getRiders', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     try {
         const { userId } = req.body;

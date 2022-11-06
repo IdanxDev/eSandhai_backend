@@ -5,6 +5,7 @@ const categorySchema = require('../../models/categorySchema');
 const helperSchema = require('../../models/helperSchema');
 const itemSchema = require('../../models/itemSchema');
 const subscriptionSchema = require('../../models/subscriptionSchema');
+const mongoose = require('mongoose')
 const timeSchema = require('../../models/timeSchema');
 router.get('/getDetails', async (req, res, next) => {
     try {

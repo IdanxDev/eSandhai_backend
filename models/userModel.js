@@ -37,7 +37,7 @@ const userSchema = mongoose.Schema({
     otp: String,
     generatedTime: [String],
     countryCode: String,
-    birthDate: String,
+    dob: String,
     //0==active
     //1==banned
     status: {
