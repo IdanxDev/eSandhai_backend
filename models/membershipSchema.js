@@ -15,6 +15,22 @@ const membershipSchema = mongoose.Schema({
     endDate: {
         type: Date
     },
+    price: {
+        type: Number,
+        default: 0
+    },
+    usedDays: {
+        type: Number,
+        default: 0
+    },
+    pendingDays: {
+        type: Number,
+        default: 0
+    },
+    note: {
+        type: String,
+        default: ""
+    },
     //0==pending
     //1==paid
     //2==expired

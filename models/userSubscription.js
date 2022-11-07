@@ -13,6 +13,32 @@ const userSubscription = mongoose.Schema({
         type: mongoose.Types.ObjectId,
         ref: "subscription"
     },
+    startDate: {
+        type: Date
+    },
+    endDate: {
+        type: Date
+    },
+    price: {
+        type: Number,
+        default: 0
+    },
+    duration: {
+        type: Number,
+        default: 0
+    },
+    usedDays: {
+        type: Number,
+        default: 0
+    },
+    pendingDays: {
+        type: Number,
+        default: 0
+    },
+    note: {
+        type: String,
+        default: ""
+    },
     pickup: {
         type: Number,
         default: 0
@@ -28,6 +54,7 @@ const userSubscription = mongoose.Schema({
     //0==pending
     //1==paid/active
     //2==expired
+    //3==payment failed
     status: {
         type: Number,
         default: 0

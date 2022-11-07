@@ -5,7 +5,7 @@ const momentTz = require('moment-timezone')
 require('dotenv').config();
 const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
-const { getCurrentDateTime24 } = require('../utility/dates');
+const { getCurrentDateTime24, makeid } = require('../utility/dates');
 const nodemailer = require("nodemailer");
 var admin = require('../utility/setup/firebase-admin');
 const { getAuth } = require("firebase-admin/auth");
@@ -342,31 +342,34 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         const { name, dob, mobileNo, gender, email, otp } = req.body;
 
         const userId = req.user._id
-        if (otp == undefined && (email == undefined || mobileNo == undefined)) {
+        if (otp == undefined && (email != undefined || mobileNo != undefined)) {
             return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
         }
-        let checkEmail = await userSchema.aggregate([
-            {
-                $match: {
-                    $or: [
-                        {
-                            $and: [
-                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                { email: email }
-                            ]
-                        },
-                        {
-                            $and: [
-                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                { mobileNo: mobileNo }
-                            ]
-                        }
-                    ]
+
+        if (email != undefined || mobileNo != undefined) {
+            let checkEmail = await userSchema.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            {
+                                $and: [
+                                    { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+                                    { email: email }
+                                ]
+                            },
+                            {
+                                $and: [
+                                    { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+                                    { mobileNo: mobileNo }
+                                ]
+                            }
+                        ]
+                    }
                 }
+            ])
+            if (checkEmail.length > 0) {
+                return res.status(403).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
             }
-        ])
-        if (checkEmail.length > 0) {
-            return res.status(403).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
         }
         let checkUser = await userSchema.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }]);
         let updateUser = await userSchema.findByIdAndUpdate(userId, { gender: gender, name: name, birthDate: dob }, { new: true })
@@ -1148,18 +1151,28 @@ router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
 })
 router.post('/addSubscription', authenticateToken, async (req, res, next) => {
     try {
-        const { planId } = req.body;
+        const { planId, duration } = req.body;
         const userId = req.user._id;
         let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
         // console.log(checkCategory);
         if (checkCategory == undefined || checkCategory == null) {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
         }
+
+        let orderId = makeid(12);
+        let pendingDays = duration == 0 ? 28 : (duration == 1 ? (28 * 6) : 365);
         let createAddress = new userSubscription({
             planId: planId,
             userId: userId,
+            orderId: orderId,
             pickup: checkCategory.pickup,
             delivery: checkCategory.delivery,
+            price: duration == 0 ? checkCategory.month : (duration == 1 ? checkCategory.quarterly : checkCategory.year),
+            duration: duration,
+            pendingDays: pendingDays,
+            usedDays: 0,
+            startDate: moment(),
+            endDate: moment().add(pendingDays, 'days')
         })
 
         await createAddress.save();
@@ -1210,7 +1223,7 @@ router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => 
 })
 router.put('/updateSubscription', authenticateToken, async (req, res, next) => {
     try {
-        const { subscriptionId, status, paymentId } = req.body;
+        const { subscriptionId, status, paymentId, note } = req.body;
         const userId = req.user._id;
         let checkCategory = await userSubscription.findById(mongoose.Types.ObjectId(subscriptionId));
         // console.log(checkCategory);
@@ -1219,7 +1232,8 @@ router.put('/updateSubscription', authenticateToken, async (req, res, next) => {
         }
         let updateField = {
             status: status,
-            paymentId: paymentId
+            paymentId: paymentId,
+            note: note
         }
         let createAddress = await userSubscription.findByIdAndUpdate(subscriptionId, updateField, { new: true });
         createAddress._doc['id'] = createAddress._doc['_id'];

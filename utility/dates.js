@@ -8,6 +8,15 @@ exports.validatePhoneNumber = (input_str) => {
     var re = /^\(?(\d{3})\)?[- ]?(\d{3})[- ]?(\d{4})$/;
     return re.test(input_str);
 }
+exports.makeid = (length) => {
+    var result = '';
+    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for (var i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}
 exports.getCurrentDateTime = (timeZone) => {
     let date = moment()
         .tz(timeZone)
