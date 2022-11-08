@@ -40,6 +40,10 @@ const itemSchema = mongoose.Schema({
     priceTag: {
         type: String,
         default: ""
+    },
+    unitType: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

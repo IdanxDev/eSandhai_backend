@@ -196,93 +196,123 @@ router.put('/updateInternalEmployee', authenticateToken, checkUserRole(['superAd
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
-router.post('/updateProfile', authenticateToken, [check('name', 'please pass valid name').optional().notEmpty().isString().withMessage("please pass valid name"),
-check('birthDate', 'please pass valid date').optional().notEmpty().trim().custom((value) => { return /^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[13-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$/.test(value) }).withMessage("please pass valid date"),
-check('mobileNo', 'please pass valid mobile no').optional().notEmpty().isMobilePhone().withMessage("please pass valid mobile no"),
-check('email', 'please pass valid email').optional().notEmpty().isEmail().withMessage("please pass valid email")], checkErr, async (req, res, next) => {
-    try {
-        const { name, birthDate, mobileNo, email, isVerify } = req.body;
+router.post('/updateProfile', authenticateToken, checkUserRole(['superAdmin']),
+    [check('name', 'please pass valid name').optional().notEmpty().isString().withMessage("please pass valid name"),
+    body('role').isIn(["superAdmin", "admin", "employee"]).optional().withMessage("please pass valid role"),
+    body('gender').isIn(["Male", "Female", "Other"]).optional().withMessage("please pass valid gender value"),
+    body('birthDate').optional().custom((value) => { return regex.test(value) }).withMessage("please pass dob"),
+    body('alternativeMobile').optional().isMobilePhone().withMessage("please pass mobile no"),
+    body('fatherName', 'please pass valid father name').optional().notEmpty().isString(),
+    body('bloodGroup', 'please pass valid blood group detail').optional().notEmpty().isString()
+    ], checkErr, async (req, res, next) => {
+        try {
+            const { name, birthDate, gender, fatherName, alternativeMobile, bloodGroup } = req.body;
+            const userId = req.user._id;
+            const checkExist = await adminSchema.findById(userId);
+            if (checkExist == null || checkExist == undefined) {
+                return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "user not found" });
+            }
+            let updateUser = await adminSchema.findByIdAndUpdate(userId, req.body, { new: true });
+            updateUser._doc['id'] = updateUser._doc['_id'];
+            delete updateUser._doc.updatedAt;
+            delete updateUser._doc.createdAt;
+            delete updateUser._doc._id;
+            delete updateUser._doc.__v;
+            delete updateUser._doc.generatedTime;
+            delete updateUser._doc.otp
 
-        const userId = req.user._id
-
-        let checkEmail = await adminSchema.aggregate([
-            {
-                $match: {
-                    $or: [
-                        {
-                            $and: [
-                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                { email: email }
-                            ]
-                        },
-                        {
-                            $and: [
-                                { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                { mobileNo: mobileNo }
-                            ]
-                        }
-                    ]
-                }
-            },
-            {
-                $addFields: {
-                    "id": "$_id"
-                }
-            },
-            {
-                $project: {
-                    __v: 0,
-                    createdAt: 0,
-                    updatedAt: 0
-                }
-            }
-        ])
-        if (checkEmail.length != 0) {
-            let state = 4;
-            if (email != undefined && email == checkEmail[0].email && userId != checkEmail[0]._id.toString()) {
-                state = 0
-            }
-            if (mobileNo != undefined && mobileNo == checkEmail[0].mobileNo && userId != checkEmail[0]._id.toString()) {
-                state = 1
-            }
-            if (state != 4) {
-                delete checkEmail[0]._id;
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: checkEmail[0] }, message: state == 0 ? "thie email already exist" : "this mobile no already exist" });
-            }
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser }, message: "user details updated" });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
-        let updateUser = await adminSchema.findByIdAndUpdate(userId, { email: email, name: name, mobileNo: mobileNo, birthDate: birthDate }, { new: true })
-        updateUser._doc['id'] = updateUser._doc['_id'];
-        delete updateUser._doc.updatedAt;
-        delete updateUser._doc.createdAt;
-        delete updateUser._doc._id;
-        delete updateUser._doc.__v;
-        delete updateUser._doc.generatedTime;
-        delete updateUser._doc.otp
+    })
+// router.post('/updateProfile', authenticateToken, [check('name', 'please pass valid name').optional().notEmpty().isString().withMessage("please pass valid name"),
+// check('birthDate', 'please pass valid date').optional().notEmpty().trim().custom((value) => { return /^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[13-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$/.test(value) }).withMessage("please pass valid date"),
+// check('mobileNo', 'please pass valid mobile no').optional().notEmpty().isMobilePhone().withMessage("please pass valid mobile no"),
+// check('email', 'please pass valid email').optional().notEmpty().isEmail().withMessage("please pass valid email")], checkErr, async (req, res, next) => {
+//     try {
+//         const { name, birthDate, mobileNo, email, isVerify } = req.body;
 
-        if (isVerify != undefined && isVerify == true) {
-            if (email != undefined && validateEmail(email)) {
-                otp = getRandomIntInclusive(111111, 999999);
-                res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser, otp: otp }, message: "user found" });
-                let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
-                let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
-                await main(checkExist[0].email, message);
-            }
-            else if (mobileNo != undefined && validatePhoneNumber(mobileNo)) {
-                otp = getRandomIntInclusive(111111, 999999);
-                res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser, otp: otp }, message: "otp sent to mobile no" });
+//         const userId = req.user._id
 
-                console.log(otp);
-                let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
-                let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
-                await sendSms(countryCode + mobileNo, `Helllo User, Your otp for laundary service is ${otp} , Please Do not share this otp with anyone`);
+//         let checkEmail = await adminSchema.aggregate([
+//             {
+//                 $match: {
+//                     $or: [
+//                         {
+//                             $and: [
+//                                 { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+//                                 { email: email }
+//                             ]
+//                         },
+//                         {
+//                             $and: [
+//                                 { _id: { $ne: mongoose.Types.ObjectId(userId) } },
+//                                 { mobileNo: mobileNo }
+//                             ]
+//                         }
+//                     ]
+//                 }
+//             },
+//             {
+//                 $addFields: {
+//                     "id": "$_id"
+//                 }
+//             },
+//             {
+//                 $project: {
+//                     __v: 0,
+//                     createdAt: 0,
+//                     updatedAt: 0
+//                 }
+//             }
+//         ])
+//         if (checkEmail.length != 0) {
+//             let state = 4;
+//             if (email != undefined && email == checkEmail[0].email && userId != checkEmail[0]._id.toString()) {
+//                 state = 0
+//             }
+//             if (mobileNo != undefined && mobileNo == checkEmail[0].mobileNo && userId != checkEmail[0]._id.toString()) {
+//                 state = 1
+//             }
+//             if (state != 4) {
+//                 delete checkEmail[0]._id;
+//                 return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: checkEmail[0] }, message: state == 0 ? "thie email already exist" : "this mobile no already exist" });
+//             }
+//         }
+//         let updateUser = await adminSchema.findByIdAndUpdate(userId, { email: email, name: name, mobileNo: mobileNo, birthDate: birthDate }, { new: true })
+//         updateUser._doc['id'] = updateUser._doc['_id'];
+//         delete updateUser._doc.updatedAt;
+//         delete updateUser._doc.createdAt;
+//         delete updateUser._doc._id;
+//         delete updateUser._doc.__v;
+//         delete updateUser._doc.generatedTime;
+//         delete updateUser._doc.otp
 
-            }
-        }
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser }, message: "user details updated" });
-    } catch (error) {
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
+//         if (isVerify != undefined && isVerify == true) {
+//             if (email != undefined && validateEmail(email)) {
+//                 otp = getRandomIntInclusive(111111, 999999);
+//                 res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser, otp: otp }, message: "user found" });
+//                 let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+//                 let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
+//                 await main(checkExist[0].email, message);
+//             }
+//             else if (mobileNo != undefined && validatePhoneNumber(mobileNo)) {
+//                 otp = getRandomIntInclusive(111111, 999999);
+//                 res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser, otp: otp }, message: "otp sent to mobile no" });
+
+//                 console.log(otp);
+//                 let update = await userSchema.findByIdAndUpdate(userId, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+//                 let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
+//                 await sendSms(countryCode + mobileNo, `Helllo User, Your otp for laundary service is ${otp} , Please Do not share this otp with anyone`);
+
+//             }
+//         }
+//         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser }, message: "user details updated" });
+//     } catch (error) {
+//         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+//     }
+// })
 router.post('/resendOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no")], checkErr, async (req, res, next) => {
     try {
         const { id } = req.body;
@@ -1528,7 +1558,7 @@ router.put('/updateHelper', authenticateToken, checkUserRole(['superAdmin']), up
                     removeObject(key)
                 }
             }
-            let update = await helperSchema.findByIdAndUpdate(categoryId, addCategory, { new: true });
+            let update = await helperSchema.findByIdAndUpdate(helperId, addCategory, { new: true });
             if (update != undefined) {
                 update._doc['id'] = update._doc['_id'];
                 delete update._doc.updatedAt;
@@ -1536,7 +1566,7 @@ router.put('/updateHelper', authenticateToken, checkUserRole(['superAdmin']), up
                 delete update._doc._id;
                 delete update._doc.__v;
             }
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `${update.name} successfully updated` });
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `${update.title} successfully updated` });
         } catch (error) {
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
@@ -1643,11 +1673,13 @@ router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploa
     body('discount', 'please pass discount').optional().notEmpty().isNumeric(),
     body('price', 'please pass valid price value').optional().notEmpty().isNumeric(),
     body('priceTag', 'please pass valid price tag').optional().notEmpty().isString(),
+    body('unitType', 'please pass valid unit type').optional().notEmpty().isString(),
     body('categoryId', 'please provide category id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res) => {
         try {
             const { name, description, isVisible,
                 mrp,
                 discount,
+                unitType,
                 price,
                 isBag,
                 categoryId,
@@ -1687,6 +1719,7 @@ router.post('/addItems', authenticateToken, checkUserRole(['superAdmin']), uploa
                 icon: req.file != undefined ? req.file.location : "",
                 description: description,
                 mrp: mrp,
+                unitType: unitType,
                 discount: discount != undefined ? discount : value,
                 isBag: isBag,
                 priceTag: priceTag,
@@ -1714,10 +1747,11 @@ router.put('/updateItems', authenticateToken, checkUserRole(['superAdmin']), upl
     body('discount', 'please pass discount').optional().notEmpty().isNumeric(),
     body('price', 'please pass valid price value').optional().notEmpty().isNumeric(),
     body('priceTag', 'please pass valid price tag').optional().notEmpty().isString(),
+    body('unitType', 'please pass valid unit type').optional().notEmpty().isString(),
     body('categoryId', 'please provide category id').optional().custom((value) => mongoose.Types.ObjectId.isValid(value)),
     body('itemId', 'please pass valid item id').custom((value) => mongoose.Types.ObjectId.isValid(value))], checkErr, async (req, res) => {
         try {
-            const { name, categoryId, description, isVisible, isBag, priceTag, itemId } = req.body;
+            const { name, categoryId, description, unitType, isVisible, isBag, priceTag, itemId } = req.body;
             let { mrp, price, discount } = req.body;
             let checkItem = await itemSchema.findById(itemId);
             if (checkItem == undefined || checkItem == null) {
@@ -1764,6 +1798,7 @@ router.put('/updateItems', authenticateToken, checkUserRole(['superAdmin']), upl
                 description: description,
                 mrp: mrp,
                 discount: discount,
+                unitType: unitType,
                 isBag: isBag,
                 priceTag: priceTag,
                 price: price,
@@ -1797,6 +1832,10 @@ router.get('/getItems', authenticateToken, async (req, res) => {
         if ('name' in req.query) {
             let regEx = new RegExp(req.query.name, 'i')
             anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('unitType' in req.query) {
+            let regEx = new RegExp(req.query.unitType, 'i')
+            anotherMatch.push({ unitType: { $regex: regEx } })
         }
         if ('isVisible' in req.query) {
             anotherMatch.push({ isVisible: req.query.isVisible === 'true' })
@@ -2011,7 +2050,32 @@ router.put('/updatePlan', authenticateToken, checkUserRole(['superAdmin']), uplo
     })
 router.get('/getPlan', authenticateToken, async (req, res) => {
     try {
+        let anotherMatch = [];
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('tag' in req.query) {
+            let regEx = new RegExp(req.query.tag, 'g')
+            anotherMatch.push({ tag: { $regex: regEx } })
+        }
+        console.log(anotherMatch);
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
         let getUsers = await subscriptionSchema.aggregate([
+            match,
             {
                 $match: {
                     isVisible: true
@@ -2401,17 +2465,18 @@ router.post('/addProof', authenticateToken, checkUserRole(['superAdmin']), uploa
     })
 router.put('/updateProof', authenticateToken, checkUserRole(['superAdmin']),
     [
+        body('description').optional().notEmpty().isString().withMessage("please pass string value for description"),
         body('isVerified').optional().isBoolean().withMessage("please pass boolean for visibility"),
         body('proofId', 'please pass valid proof id').notEmpty().custom((value) => mongoose.Types.ObjectId.isValid(value))
     ]
     , checkErr, async (req, res) => {
         try {
-            const { proofId, isVerified } = req.body;
+            const { proofId, isVerified, description } = req.body;
             let checkProof = await proofSchema.findById(proofId);
             if (checkProof == undefined || checkProof == null) {
                 return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `no proof found` });
             }
-            let removeProof = await proofSchema.findByIdAndUpdate(proofId, { isVerified: isVerified }, { new: true });
+            let removeProof = await proofSchema.findByIdAndUpdate(proofId, { isVerified: isVerified, description: description }, { new: true });
             removeProof._doc['id'] = removeProof._doc['_id'];
             delete removeProof._doc.updatedAt;
             delete removeProof._doc.createdAt;

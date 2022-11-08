@@ -15,6 +15,10 @@ const proofSchema = mongoose.Schema({
     isVerified: {
         type: Boolean,
         default: false
+    },
+    description: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 
