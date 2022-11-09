@@ -326,6 +326,11 @@ router.get('/getHelper', authenticateToken, async (req, res) => {
             },
             {
                 $project: {
+                    title: { $ifNull: ["$title", "unspecified"] }
+                }
+            },
+            {
+                $project: {
                     _id: 0,
                     __v: 0,
                     categoryData: 0
