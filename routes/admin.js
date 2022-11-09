@@ -659,7 +659,7 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
 })
 router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     try {
-        const { userId } = req.body;
+        const { userId } = req.query;
         let match;
         let anotherMatch = [];
         if ('name' in req.query) {
@@ -676,6 +676,7 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
             anotherMatch.push({
                 _id: mongoose.Types.ObjectId(userId)
             })
+            console.log(anotherMatch);
         }
         console.log(anotherMatch);
         if (anotherMatch.length > 0) {
