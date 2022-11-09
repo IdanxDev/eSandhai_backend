@@ -7,6 +7,7 @@ const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
 const { getCurrentDateTime24, makeid } = require('../utility/dates');
 const nodemailer = require("nodemailer");
+const { checkExpireSubscription, checkExpireMemberShip } = require('../utility/expiration');
 var admin = require('../utility/setup/firebase-admin');
 const { getAuth } = require("firebase-admin/auth");
 const { check, body, oneOf } = require('express-validator')
@@ -1257,6 +1258,74 @@ router.put('/updateDeluxMembership', authenticateToken, async (req, res, next) =
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        await checkExpireMemberShip();
+        let getAddress = await membershipSchema.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { status: { $nin: [2, 3] } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $lookup: {
+                    from: "membershipdetails",
+                    let: { id: "$membershipId" },
+                    pipeline: [{
+                        $match: {
+                            $expr: {
+                                $eq: ["$_id", "$$id"]
+                            }
+                        }
+                    },
+                    {
+                        $addFields: {
+                            "id": "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            __v: 0,
+                            isVisible: 0,
+                            createdAt: 0,
+                            updatedAt: 0
+                        }
+                    }],
+                    as: "membershipDetails"
+                }
+            },
+            {
+                $addFields: {
+                    membershipDetails: { $first: "$membershipDetails" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ]);
+
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "delux membership detail found" : "delux membership not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.put('/updateSubscription', authenticateToken, async (req, res, next) => {
     try {
         const { subscriptionId, status, paymentId, note } = req.body;
@@ -1287,35 +1356,14 @@ router.put('/updateSubscription', authenticateToken, async (req, res, next) => {
 router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
-        let getAddressIs = await userSubscription.aggregate([
-            {
-                $set: {
-                    pendingDays:
-                    {
-                        $dateDiff:
-                        {
-                            startDate: "$startDate",
-                            endDate: new Date(),
-                            unit: "day"
-                        }
-                    },
-                    usedDays:
-                    {
-                        $dateDiff:
-                        {
-                            startDate: "$endDate",
-                            endDate: new Date(),
-                            unit: "day"
-                        }
-                    }
-                }
-            }
-        ])
-        console.log(getAddressIs);
+        await checkExpireSubscription();
         let getAddress = await userSubscription.aggregate([
             {
                 $match: {
-                    userId: mongoose.Types.ObjectId(userId)
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { status: { $nin: [2, 3] } }
+                    ]
                 }
             },
             {

@@ -7,6 +7,9 @@ const itemSchema = require('../../models/itemSchema');
 const subscriptionSchema = require('../../models/subscriptionSchema');
 const mongoose = require('mongoose')
 const timeSchema = require('../../models/timeSchema');
+const userSubscription = require('../../models/userSubscription');
+const userModel = require('../../models/userModel');
+const { checkUserSubscriptionMember } = require('../../utility/expiration');
 router.get('/getDetails', async (req, res, next) => {
     try {
         const { status } = req.query;
@@ -178,6 +181,7 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
 })
 router.get('/getItems', authenticateToken, async (req, res) => {
     try {
+        const userId = req.user._id;
         let match;
         let anotherMatch = [];
         if ('name' in req.query) {
@@ -193,6 +197,11 @@ router.get('/getItems', authenticateToken, async (req, res) => {
         }
         if ('categoryId' in req.query) {
             anotherMatch.push({ categoryId: mongoose.Types.ObjectId(req.query.categoryId) })
+            let checkCategory = await categorySchema.findById(req.query.categoryId);
+            let check = await checkUserSubscriptionMember(userId);
+            if (check.length > 0 && check[0].isSubscription == true && checkCategory != undefined && checkCategory.isSubscription == true) {
+                anotherMatch.push({ isBag: true })
+            }
         }
         if ('isBag' in req.query) {
             anotherMatch.push({ isBag: req.query.isBag === 'true' })

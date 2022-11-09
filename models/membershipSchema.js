@@ -42,6 +42,7 @@ const membershipSchema = mongoose.Schema({
     //0==pending
     //1==paid
     //2==expired
+    //3==payment failed
     status: {
         type: Number,
         default: 0
