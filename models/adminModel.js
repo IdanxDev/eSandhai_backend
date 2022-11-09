@@ -49,9 +49,18 @@ const adminSchema = mongoose.Schema({
     },
     //0==active
     //1==inactive
+    //2==banned
     status: {
         type: Number,
         default: 0
+    },
+    reason: {
+        type: String,
+        default: ""
+    },
+    note: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

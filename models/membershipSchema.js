@@ -9,7 +9,7 @@ const membershipSchema = mongoose.Schema({
         type: String,
         default: ""
     },
-    purchaseDate: {
+    startDate: {
         type: Date
     },
     endDate: {
@@ -27,9 +27,17 @@ const membershipSchema = mongoose.Schema({
         type: Number,
         default: 0
     },
+    paymentId: {
+        type: String,
+        default: ""
+    },
     note: {
         type: String,
         default: ""
+    },
+    membershipId: {
+        type: mongoose.Types.ObjectId,
+        ref: "membershipdetails"
     },
     //0==pending
     //1==paid

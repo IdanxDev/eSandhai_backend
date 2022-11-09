@@ -19,6 +19,8 @@ const { checkErr } = require('../utility/error');
 const userSubscription = require('../models/userSubscription');
 const subscriptionSchema = require('../models/subscriptionSchema');
 const bodySchema = require('../models/bodySchema');
+const membershipDetails = require('../models/membershipDetails');
+const membershipSchema = require('../models/membershipSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -1192,18 +1194,24 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
 })
 router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => {
     try {
-        const { planId } = req.body;
+        const { detailId, duration } = req.body;
         const userId = req.user._id;
-        let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
+        let checkCategory = await membershipDetails.findById(detailId);
         // console.log(checkCategory);
         if (checkCategory == undefined || checkCategory == null) {
-            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership details not found` });
         }
-        let createAddress = new userSubscription({
-            planId: planId,
+        let orderId = makeid(12);
+        let pendingDays = duration == 0 ? 28 : (duration == 1 ? (28 * 6) : 365);
+        let createAddress = new membershipSchema({
+            membershipId: detailId,
             userId: userId,
-            pickup: checkCategory.pickup,
-            delivery: checkCategory.delivery,
+            price: duration == 0 ? checkCategory.month : (duration == 1 ? checkCategory.quarterly : checkCategory.year),
+            startDate: moment(),
+            endDate: moment().add(pendingDays, 'days'),
+            orderId: orderId,
+            pendingDays: pendingDays,
+            usedDays: 0
         })
 
         await createAddress.save();
@@ -1214,7 +1222,35 @@ router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => 
         delete createAddress._doc.__v;
         delete createAddress._doc.paymentId;
         delete createAddress._doc.orderStatus;
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user subscription added" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user membership added" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateDeluxMembership', authenticateToken, async (req, res, next) => {
+    try {
+        const { membershipId, status, paymentId, note } = req.body;
+        const userId = req.user._id;
+        let checkCategory = await membershipSchema.findById(membershipId);
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership details not found` });
+        }
+        let update = {
+            paymentId: paymentId,
+            status: status,
+            note: note
+        }
+
+        let createAddress = await membershipSchema.findByIdAndUpdate(membershipId, update, { new: true });
+        createAddress._doc['id'] = createAddress._doc['_id'];
+        delete createAddress._doc.updatedAt;
+        delete createAddress._doc.createdAt;
+        delete createAddress._doc._id;
+        delete createAddress._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user membership updated" });
 
     } catch (error) {
         console.log(error.message);
@@ -1251,6 +1287,31 @@ router.put('/updateSubscription', authenticateToken, async (req, res, next) => {
 router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
+        let getAddressIs = await userSubscription.aggregate([
+            {
+                $set: {
+                    pendingDays:
+                    {
+                        $dateDiff:
+                        {
+                            startDate: "$startDate",
+                            endDate: new Date(),
+                            unit: "day"
+                        }
+                    },
+                    usedDays:
+                    {
+                        $dateDiff:
+                        {
+                            startDate: "$endDate",
+                            endDate: new Date(),
+                            unit: "day"
+                        }
+                    }
+                }
+            }
+        ])
+        console.log(getAddressIs);
         let getAddress = await userSubscription.aggregate([
             {
                 $match: {

@@ -75,6 +75,14 @@ const riderSchema = mongoose.Schema({
     riderExpiry: {
         type: String,
         default: ""
+    },
+    reason: {
+        type: String,
+        default: ""
+    },
+    note: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 
