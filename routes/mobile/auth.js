@@ -801,6 +801,42 @@ router.get('/address', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getDefaultAddress', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        console.log(userId);
+        let getAddress = await addressSchema.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { isActive: true },
+                        {
+                            isDefault: true
+                        }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ]);
+
+        return res.status(getAddress.length > 0 ? 200 : 200).json({ issuccess: getAddress.length > 0 ? true : false, data: { acknowledgement: getAddress.length > 0 ? true : false, data: getAddress.length > 0 ? getAddress[0] : {} }, message: getAddress.length > 0 ? "address found" : "address not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
