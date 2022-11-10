@@ -334,7 +334,7 @@ router.get('/getHelper', authenticateToken, async (req, res) => {
                 }
             },
             {
-                $project: {
+                $addFields: {
                     title: { $ifNull: ["$title", "unspecified"] }
                 }
             },
