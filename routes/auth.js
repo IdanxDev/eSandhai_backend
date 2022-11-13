@@ -3,11 +3,12 @@ var router = express.Router();
 const moment = require('moment');
 const momentTz = require('moment-timezone')
 require('dotenv').config();
+const bcrypt = require('bcrypt');
 const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
 const { getCurrentDateTime24, makeid } = require('../utility/dates');
 const nodemailer = require("nodemailer");
-const { checkExpireSubscription, checkExpireMemberShip } = require('../utility/expiration');
+const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember } = require('../utility/expiration');
 var admin = require('../utility/setup/firebase-admin');
 const { getAuth } = require("firebase-admin/auth");
 const { check, body, oneOf } = require('express-validator')
@@ -22,6 +23,8 @@ const subscriptionSchema = require('../models/subscriptionSchema');
 const bodySchema = require('../models/bodySchema');
 const membershipDetails = require('../models/membershipDetails');
 const membershipSchema = require('../models/membershipSchema');
+const invoiceSchema = require('../models/invoiceSchema');
+const orderItems = require('../models/orderItems');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));

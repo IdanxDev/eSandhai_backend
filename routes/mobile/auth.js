@@ -738,7 +738,7 @@ router.put('/updateAddress', authenticateToken, async (req, res, next) => {
         if (checkAddress.length == 0) {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "address not found" });
         }
-        if (isDefault) {
+        if (isDefault != undefined && isDefault == true) {
             let update = await addressSchema.updateMany({ userId: mongoose.Types.ObjectId(userId) }, { isDefault: false });
         }
         let createAddress = {
