@@ -630,15 +630,36 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
                     id: "$_id"
                 }
             },
+
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
             {
                 $project: {
                     __v: 0,
                     _id: 0,
                     password: 0,
                     otp: 0,
-                    generatedTime: 0,
-                    createdAt: 0,
-                    updatedAt: 0
+                    generatedTime: 0
                 }
             },
             {
@@ -1376,12 +1397,12 @@ router.post('/suspendUser', authenticateToken, checkUserRole(['superAdmin']),
             }
             checkUser = await adminSchema.findById(userId);
             if (checkUser != null && checkUser != undefined) {
-                let updateUser = await adminSchema.findByIdAndUpdate(userId, { activeStatus: status, note: note, reason: reason }, { new: true });
+                let updateUser = await adminSchema.findByIdAndUpdate(userId, { status: status, note: note, reason: reason }, { new: true });
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser }, message: `admin status updated` });
             }
             checkUser = await riderSchema.findById(userId);
             if (checkUser != null && checkUser != undefined) {
-                let updateUser = await riderSchema.findByIdAndUpdate(userId, { status: status, note: note, reason: reason }, { new: true });
+                let updateUser = await riderSchema.findByIdAndUpdate(userId, { activeStatus: status, note: note, reason: reason }, { new: true });
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateUser }, message: `rider status updated` });
             }
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `no user found` });
@@ -1432,10 +1453,11 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
     [body("name", "please provide valid name").notEmpty().isString(),
     body("start", "please provide start hours").notEmpty().isString(),
     body('end', "please provide ending hours").notEmpty().isString(),
+    body('discount', "please provide discount value").notEmpty().isNumeric(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            let { name, start, end, isVisible } = req.body;
+            let { name, start, discount, end, isVisible } = req.body;
 
             let checkCategory = await couponSchema.findOne({ name: name });
 
@@ -1451,6 +1473,7 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 name: name,
                 start: startIs,
                 end: endIs,
+                discount: discount,
                 isVisible: isVisible
             })
 
@@ -1473,7 +1496,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body('couponId', "please pass valid coupon id").custom((value) => mongoose.Types.ObjectId.isValid(value))
     ], checkErr, checkErr, async (req, res) => {
         try {
-            const { name, start, end, isVisible, couponId } = req.body;
+            const { name, discount, start, end, isVisible, couponId } = req.body;
 
             let checkCategory = await couponSchema.findById(couponId);
             if (checkCategory == undefined || checkCategory == null) {
@@ -1490,6 +1513,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
             let addCategory = {
                 name: name,
                 start: startIs,
+                discount: discount,
                 end: endIs,
                 isVisible: isVisible
             }
@@ -2202,7 +2226,7 @@ router.get('/getItems', authenticateToken, async (req, res) => {
                 }
             }
         ])
-        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category items found` : "no category items found" });
+        return res.status(getUsers.length > 0 ? 200 : 200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category items found` : "no category items found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
