@@ -8,6 +8,8 @@ const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
 const { getCurrentDateTime24, makeid } = require('../utility/dates');
 const nodemailer = require("nodemailer");
+
+const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember } = require('../utility/expiration');
 var admin = require('../utility/setup/firebase-admin');
 const { getAuth } = require("firebase-admin/auth");
@@ -348,6 +350,7 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         const { name, dob, mobileNo, gender, email, otp } = req.body;
 
         const userId = req.user._id
+        console.log(userId);
         if (otp == undefined && (email != undefined || mobileNo != undefined)) {
             return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
         }
@@ -366,13 +369,14 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
                             {
                                 $and: [
                                     { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                    { mobileNo: mobileNo }
+                                    { mobileNo: mobileNo != undefined ? mobileNo : "" }
                                 ]
                             }
                         ]
                     }
                 }
             ])
+            console.log(checkEmail);
             if (checkEmail.length > 0) {
                 return res.status(403).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
             }
@@ -427,6 +431,9 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         getUser._doc['id'] = getUser._doc['_id'];
         delete getUser._doc.updatedAt;
         delete getUser._doc.createdAt;
+        delete getUser._doc.password;
+        delete getUser._doc.otp;
+        delete getUser._doc.generatedTime;
         delete getUser._doc._id;
         delete getUser._doc.__v;
         delete getUser._doc.paymentId;
@@ -604,7 +611,13 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
                 }
             },
             {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
                 $project: {
+                    "_id": 0,
                     "generatedTime": 0,
                     "createdAt": 0,
                     "updatedAt": 0,
@@ -815,7 +828,9 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${userId}` });
         }
         if (otp == '000000') {
-            let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
+            const salt = await bcrypt.genSalt(10);
+            const hashedpassword = await bcrypt.hash(password, salt);
+            let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: hashedpassword }, { new: true });
             return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
 
         }
@@ -829,7 +844,9 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         if (timeIs >= startIs && timeIs <= endIs) {
             //otp valid
             if (checkUser[0].otp == otp) {
-                let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
+                const salt = await bcrypt.genSalt(10);
+                const hashedpassword = await bcrypt.hash(password, salt);
+                let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: hashedpassword }, { new: true });
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
             }
             else {
@@ -909,12 +926,34 @@ router.get('/getUserAddress', authenticateToken, checkUserRole(['superAdmin']), 
 router.get('/getUserSubscription', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.query.id
+        let match;
+        let anotherMatch = [];
+
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        console.log(match);
         let getAddress = await userSubscription.aggregate([
             {
                 $match: {
                     userId: mongoose.Types.ObjectId(userId)
                 }
             },
+            match,
             {
                 $addFields: {
                     "id": "$_id"
@@ -1265,6 +1304,26 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
         await checkExpireMemberShip();
+        let match;
+        let anotherMatch = [];
+
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
         let getAddress = await membershipSchema.aggregate([
             {
                 $match: {
@@ -1274,6 +1333,7 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
                     ]
                 }
             },
+            match,
             {
                 $addFields: {
                     "id": "$_id"
@@ -1360,6 +1420,27 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
         await checkExpireSubscription();
+        let match;
+        let anotherMatch = [];
+
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        console.log(match);
         let getAddress = await userSubscription.aggregate([
             {
                 $match: {
@@ -1369,6 +1450,7 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
                     ]
                 }
             },
+            match,
             {
                 $addFields: {
                     "id": "$_id"
