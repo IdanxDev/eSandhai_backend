@@ -301,23 +301,13 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
                 {
                     $match: {
                         $or: [
-                            {
-                                $and: [
-                                    { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                    { email: email }
-                                ]
-                            },
-                            {
-                                $and: [
-                                    { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                    { mobileNo: mobileNo }
-                                ]
-                            }
+                            { email: email },
+                            { mobileNo: mobileNo }
                         ]
                     }
                 }
             ])
-            if (checkEmail.length > 0) {
+            if (checkEmail.length > 0 && checkEmail[0]._id.toString() != userId) {
                 return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
             }
         }

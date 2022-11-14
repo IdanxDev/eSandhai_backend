@@ -8,8 +8,6 @@ const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
 const { getCurrentDateTime24, makeid } = require('../utility/dates');
 const nodemailer = require("nodemailer");
-
-const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember } = require('../utility/expiration');
 var admin = require('../utility/setup/firebase-admin');
 const { getAuth } = require("firebase-admin/auth");
@@ -350,7 +348,6 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         const { name, dob, mobileNo, gender, email, otp } = req.body;
 
         const userId = req.user._id
-        console.log(userId);
         if (otp == undefined && (email != undefined || mobileNo != undefined)) {
             return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
         }
@@ -360,24 +357,13 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
                 {
                     $match: {
                         $or: [
-                            {
-                                $and: [
-                                    { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                    { email: email }
-                                ]
-                            },
-                            {
-                                $and: [
-                                    { _id: { $ne: mongoose.Types.ObjectId(userId) } },
-                                    { mobileNo: mobileNo != undefined ? mobileNo : "" }
-                                ]
-                            }
+                            { email: email },
+                            { mobileNo: mobileNo }
                         ]
                     }
                 }
             ])
-            console.log(checkEmail);
-            if (checkEmail.length > 0) {
+            if (checkEmail.length > 0 && checkEmail[0]._id.toString() != userId) {
                 return res.status(403).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
             }
         }
@@ -431,9 +417,6 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         getUser._doc['id'] = getUser._doc['_id'];
         delete getUser._doc.updatedAt;
         delete getUser._doc.createdAt;
-        delete getUser._doc.password;
-        delete getUser._doc.otp;
-        delete getUser._doc.generatedTime;
         delete getUser._doc._id;
         delete getUser._doc.__v;
         delete getUser._doc.paymentId;
@@ -611,13 +594,7 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
                 }
             },
             {
-                $addFields: {
-                    id: "$_id"
-                }
-            },
-            {
                 $project: {
-                    "_id": 0,
                     "generatedTime": 0,
                     "createdAt": 0,
                     "updatedAt": 0,
@@ -828,9 +805,7 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${userId}` });
         }
         if (otp == '000000') {
-            const salt = await bcrypt.genSalt(10);
-            const hashedpassword = await bcrypt.hash(password, salt);
-            let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: hashedpassword }, { new: true });
+            let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
             return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
 
         }
@@ -844,9 +819,7 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         if (timeIs >= startIs && timeIs <= endIs) {
             //otp valid
             if (checkUser[0].otp == otp) {
-                const salt = await bcrypt.genSalt(10);
-                const hashedpassword = await bcrypt.hash(password, salt);
-                let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: hashedpassword }, { new: true });
+                let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
             }
             else {
@@ -926,34 +899,12 @@ router.get('/getUserAddress', authenticateToken, checkUserRole(['superAdmin']), 
 router.get('/getUserSubscription', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.query.id
-        let match;
-        let anotherMatch = [];
-
-        if ('status' in req.query) {
-            anotherMatch.push({ status: parseInt(req.query.status) });
-        }
-        if (anotherMatch.length > 0) {
-            match = {
-                $match: {
-                    $and: anotherMatch
-                }
-            }
-        }
-        else {
-            match = {
-                $match: {
-
-                }
-            }
-        }
-        console.log(match);
         let getAddress = await userSubscription.aggregate([
             {
                 $match: {
                     userId: mongoose.Types.ObjectId(userId)
                 }
             },
-            match,
             {
                 $addFields: {
                     "id": "$_id"
@@ -1304,26 +1255,6 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
         await checkExpireMemberShip();
-        let match;
-        let anotherMatch = [];
-
-        if ('status' in req.query) {
-            anotherMatch.push({ status: parseInt(req.query.status) });
-        }
-        if (anotherMatch.length > 0) {
-            match = {
-                $match: {
-                    $and: anotherMatch
-                }
-            }
-        }
-        else {
-            match = {
-                $match: {
-
-                }
-            }
-        }
         let getAddress = await membershipSchema.aggregate([
             {
                 $match: {
@@ -1333,7 +1264,6 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
                     ]
                 }
             },
-            match,
             {
                 $addFields: {
                     "id": "$_id"
@@ -1420,27 +1350,6 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
         await checkExpireSubscription();
-        let match;
-        let anotherMatch = [];
-
-        if ('status' in req.query) {
-            anotherMatch.push({ status: parseInt(req.query.status) });
-        }
-        if (anotherMatch.length > 0) {
-            match = {
-                $match: {
-                    $and: anotherMatch
-                }
-            }
-        }
-        else {
-            match = {
-                $match: {
-
-                }
-            }
-        }
-        console.log(match);
         let getAddress = await userSubscription.aggregate([
             {
                 $match: {
@@ -1450,7 +1359,6 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
                     ]
                 }
             },
-            match,
             {
                 $addFields: {
                     "id": "$_id"
@@ -1506,7 +1414,95 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/addOrder', async (req, res, next) => {
+    try {
+        const { delivery, pickup, deliveryTimeId, pickupTimeId, status, items } = req.body;
+        const userId = req.user._id;
+        let checkSubscription = await checkUserSubscriptionMember(userId);
+        let totalAmount = 0;
+        let itemsDoc = []
+        let orderId = makeid(12);
+        if (items != undefined && items != null) {
+            for (i = 0; i < items.length; i++) {
+                totalAmount += items.amount;
+            }
+        }
+        let addOrder = new invoiceSchema({
+            delivery: delivery,
+            pickup: pickup,
+            status: status,
+            userId: userId,
+            orderId: orderId,
+            deliveryTimeId: deliveryTimeId,
+            pickupTimeId: pickupTimeId,
+            isSubscribed: checkSubscription.isSubscribed,
+            isMember: checkSubscription.isMember,
+            orderAmount: totalAmount,
+            userId: userId
+        })
+        await addOrder.save();
+        if (items != undefined && items != null) {
+            for (i = 0; i < items.length; i++) {
+                itemsDoc.push({ itemId: items.itemId, qty: items.qty, amount: items.amount, categoryId: items.categoryId, orderId: addOrder._id })
+            }
+        }
+        if (itemsDoc.length > 0) {
+            await orderItems.insertMany(itemsDoc);
+        }
+        addOrder._doc['id'] = addOrder._doc['_id'];
+        delete addOrder._doc.updatedAt;
+        delete addOrder._doc.createdAt;
+        delete addOrder._doc._id;
+        delete addOrder._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addOrder }, message: 'order added' });
+    }
+    catch (err) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/addOrderItem', async (req, res, next) => {
+    try {
+        const { qty, amount, itemId, categoryId, orderId } = req.body;
+        const userId = req.user._id;
+        let checkItems = await orderItems.findOne({ itemId: mongoose.Types.ObjectId(itemId), orderId: mongoose.Types.ObjectId(orderId) });
+        if (checkItems != null && checkItems != undefined) {
+            let updateQty = await orderItems.findByIdAndUpdate(checkItems._id, { qty: { $inc: qty } }, { new: true })
+            updateQty._doc['id'] = updateQty._doc['_id'];
+            delete updateQty._doc.updatedAt;
+            delete updateQty._doc.createdAt;
+            delete updateQty._doc._id;
+            delete updateQty._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateQty }, message: 'items updated' });
+        }
+        let addItem = new orderItems({
+            qty: qty,
+            amount: amount,
+            itemId: itemId,
+            categoryId: categoryId,
+            orderId: orderId
+        })
+        await addItem.save();
+        addItem._doc['id'] = addItem._doc['_id'];
+        delete addItem._doc.updatedAt;
+        delete addItem._doc.createdAt;
+        delete addItem._doc._id;
+        delete addItem._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addItem }, message: 'order item added' });
+    }
+    catch (err) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 
+router.get('/checkSubscriptionMember', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        let checkSubscription = await checkUserSubscriptionMember(userId)
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkSubscription }, message: "user subscription status found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 function validateEmail(emailAdress) {
     let regexEmail = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (emailAdress.match(regexEmail)) {
