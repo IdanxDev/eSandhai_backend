@@ -308,12 +308,11 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
         ]);
 
 
-
+        console.log(checkExist);
         if (checkExist.length > 0) {
             if (!(await bcrypt.compare(password, checkExist[0].password))) {
-                return res.status(401).json({ issuccess: true, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
+                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
             }
-
             delete checkExist[0].password;
             // let user = {
             //     _id: checkExist[0]._id,
@@ -805,7 +804,10 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, status: 3 }, message: `No User Found With ${userId}` });
         }
         if (otp == '000000') {
-            let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
+            const salt = await bcrypt.genSalt(10);
+            const hashedpassword = await bcrypt.hash(password, salt);
+            let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: hashedpassword }, { new: true });
+            console.log(updatePassword);
             return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
 
         }
@@ -819,7 +821,9 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         if (timeIs >= startIs && timeIs <= endIs) {
             //otp valid
             if (checkUser[0].otp == otp) {
-                let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: password }, { new: true });
+                const salt = await bcrypt.genSalt(10);
+                const hashedpassword = await bcrypt.hash(password, salt);
+                let updatePassword = await userSchema.findByIdAndUpdate(checkUser[0]._id, { password: hashedpassword }, { new: true });
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, status: 0 }, message: `password changed sucessfully` });
             }
             else {
