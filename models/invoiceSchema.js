@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const invoiceSchema = mongoose.Schema({
     delivery: String,
     pickup: String,
-    deliveryTime: {
+    deliveryTimeId: {
         type: mongoose.Types.ObjectId,
         ref: "time"
     },
-    pickupTime: {
+    pickupTimeId: {
         type: mongoose.Types.ObjectId,
         ref: "time"
     },
@@ -34,10 +34,6 @@ const invoiceSchema = mongoose.Schema({
     orderId: {
         type: String,
         default: ""
-    },
-    userId: {
-        type: mongoose.Types.ObjectId,
-        ref: "users"
     },
     paymentId: [String],
     note: String,

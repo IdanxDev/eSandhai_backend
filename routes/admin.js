@@ -30,6 +30,8 @@ const holidaySchema = require('../models/holidaySchema');
 const activeDays = require('../models/activeDays');
 const membershipDetails = require('../models/membershipDetails');
 const couponSchema = require('../models/couponSchema');
+const invoiceSchema = require('../models/invoiceSchema');
+const { getDateArray } = require('../utility/expiration');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -678,6 +680,430 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/updateOrderItem', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
+    try {
+        const { qty, amount, itemId, categoryId, orderId } = req.body;
+        const userId = req.user._id;
+        let checkItems = await orderItems.findOne({ itemId: mongoose.Types.ObjectId(itemId), orderId: mongoose.Types.ObjectId(orderId) });
+        if (checkItems != null && checkItems != undefined) {
+            let finalAmount = qty * amount;
+            let updateQty = await orderItems.findByIdAndUpdate(checkItems._id, { qty: { $inc: qty }, amount: { $inc: finalAmount } }, { new: true })
+            let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { orderAmount: { $inc: finalAmount } }, { new: true });
+            updateQty._doc['id'] = updateQty._doc['_id'];
+            delete updateQty._doc.updatedAt;
+            delete updateQty._doc.createdAt;
+            delete updateQty._doc._id;
+            delete updateQty._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateQty }, message: 'items updated' });
+        }
+        let addItem = new orderItems({
+            qty: qty,
+            amount: amount,
+            itemId: itemId,
+            categoryId: categoryId,
+            orderId: orderId
+        })
+        await addItem.save();
+        let finalAmount = qty * amount;
+        let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { orderAmount: { $inc: finalAmount } }, { new: true });
+        addItem._doc['id'] = addItem._doc['_id'];
+        delete addItem._doc.updatedAt;
+        delete addItem._doc.createdAt;
+        delete addItem._doc._id;
+        delete addItem._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addItem }, message: 'order item added' });
+    }
+    catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateOrderStatus', authenticateToken, checkUserRole(['superAdmin', 'admin']), authenticateToken, async (req, res, next) => {
+    try {
+        const { delivery, pickup, deliveryTimeId, pickupTimeId, addressId, status, orderId, paymentId, note } = req.body;
+        let checkOrder = await invoiceSchema.findById(orderId);
+        if (checkOrder != undefined && checkOrder != null) {
+            let update = {
+                delivery: delivery,
+                pickup: pickup,
+                deliveryTimeId: deliveryTimeId,
+                pickupTimeId: pickupTimeId,
+                status: status,
+                addressId: addressId,
+                paymentId: paymentId,
+                note: note
+            }
+            let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, update, { new: true });
+            updateOrder._doc['id'] = updateOrder._doc['_id'];
+            delete updateOrder._doc.updatedAt;
+            delete updateOrder._doc.createdAt;
+            delete updateOrder._doc._id;
+            delete updateOrder._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
+    }
+    catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    try {
+        const { orderId } = req.query;
+        let match;
+        let anotherMatch = [];
+        // if ('name' in req.query) {
+        //     let regEx = new RegExp(req.query.name, 'i')
+        //     anotherMatch.push({ name: { $regex: regEx } })
+        // }
+        if ('userId' in req.query) {
+            anotherMatch.push({ userId: mongoose.Types.ObjectId(req.query.userId) })
+        }
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if ('deliveryStart' in req.query && 'deliveryEnd' in req.query) {
+            let [day, month, year] = req.query.deliveryStart.split('/');
+            let startIs = new Date(+year, month - 1, +day);
+            [day, month, year] = req.query.deliveryEnd.split('/');
+            let endIs = new Date(+year, month - 1, +day);
+            console.log(startIs + " " + endIs);
+            if (startIs != undefined && isNaN(startIs) == false && endIs != undefined && isNaN(endIs) == false) {
+                let array = getDateArray(startIs, endIs);
+                console.log(array);
+                anotherMatch.push({
+                    delivery: { $in: array }
+                });
+            }
+            else {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "please pass valid dates" });
+            }
+        }
+        if ('pickupStart' in req.query && 'pickupEnd' in req.query) {
+            let [day, month, year] = req.query.pickupStart.split('/');
+            let startIs = new Date(+year, month - 1, +day);
+            [day, month, year] = req.query.pickupEnd.split('/');
+            let endIs = new Date(+year, month - 1, +day);
+            if (startIs != undefined && isNaN(startIs) == false && endIs != undefined && isNaN(endIs) == false) {
+                let array = getDateArray(startIs, endIs);
+                anotherMatch.push({
+                    pickup: { $in: array }
+                });
+            }
+            else {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "please pass valid dates" });
+            }
+        }
+        console.log(anotherMatch);
+        if ('deliveryTimeId' in req.query) {
+            anotherMatch.push({ deliveryTimeId: mongoose.Types.ObjectId(deliveryTimeId) });
+        }
+        if ('pickupTimeId' in req.query) {
+            anotherMatch.push({ pickupTimeId: mongoose.Types.ObjectId(pickupTimeId) });
+        }
+        if (orderId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(orderId)
+            })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await invoiceSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $lookup: {
+                    from: "times",
+                    let: { deliveryId: "$deliveryTimeId", pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$deliveryId"] } } }],
+                    as: "deliveryTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "times",
+                    let: { pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$pickupId"] } } }],
+                    as: "pickupTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    let: { userId: "$userId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }],
+                    as: "userData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: { addressId: "$addressId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "addressData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "orderitems",
+                    let: { id: "$_id" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$orderId", "$$id"] } } },
+                        {
+                            $lookup:
+                            {
+                                from: "categories",
+                                let: { categoryId: "$categoryId" },
+                                pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$categoryId"] } } }, { $addFields: { id: "$_id" } }, { $project: { _id: 0, __v: 0 } }],
+                                as: "categoryData"
+                            }
+                        },
+                        {
+                            $addFields: {
+                                categoryName: { $first: "$categoryData" },
+                                id: "$_id"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0, __v: 0
+                            }
+                        },
+                        {
+                            $lookup:
+                            {
+                                from: "items",
+                                let: { id: "$itemId" },
+                                pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$id"] } } }, { $addFields: { id: "$_id" } }, { $project: { _id: 0, __v: 0 } }],
+                                as: "itemData"
+                            }
+                        }, {
+                            $addFields: {
+                                itemData: { $first: "$itemData" }
+                            }
+                        },
+                    ],
+                    as: "ordermItems"
+                }
+            },
+            {
+                $addFields: {
+                    invoiceId: "$orderId",
+                    paymentStatus: { $cond: { if: { $and: [{ $isArray: "$paymentId" }, { $gte: [{ $size: "$paymentId" }, 1] }] }, then: 1, else: 0 } },
+                    invoiceStatus: "$status",
+                    amount: "$orderAmount",
+                    name: { $first: "$userData.name" },
+                    addressData: { $first: "$addressData" },
+                    deliveryTime: { $concat: [{ $first: "$deliveryTime.start" }, "-", { $first: "$deliveryTime.end" }] },
+                    pickupTime: { $concat: [{ $first: "$pickupTime.start" }, "-", { $first: "$pickupTime.end" }] }
+                }
+            },
+
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    userData: 0,
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `invoice order found` : "no any invoice orders found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/invoiceList', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    try {
+        const { orderId } = req.query;
+        let match;
+        let anotherMatch = [];
+        // if ('name' in req.query) {
+        //     let regEx = new RegExp(req.query.name, 'i')
+        //     anotherMatch.push({ name: { $regex: regEx } })
+        // }
+        if ('userId' in req.query) {
+            anotherMatch.push({ userId: mongoose.Types.ObjectId(req.query.userId) })
+        }
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if ('deliveryStart' in req.query && 'deliveryEnd' in req.query) {
+            let [day, month, year] = req.query.deliveryStart.split('/');
+            let startIs = new Date(+year, month - 1, +day);
+            [day, month, year] = req.query.deliveryEnd.split('/');
+            let endIs = new Date(+year, month - 1, +day);
+            console.log(startIs + " " + endIs);
+            if (startIs != undefined && isNaN(startIs) == false && endIs != undefined && isNaN(endIs) == false) {
+                let array = getDateArray(startIs, endIs);
+                console.log(array);
+                anotherMatch.push({
+                    delivery: { $in: array }
+                });
+            }
+            else {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "please pass valid dates" });
+            }
+        }
+        if ('pickupStart' in req.query && 'pickupEnd' in req.query) {
+            let [day, month, year] = req.query.pickupStart.split('/');
+            let startIs = new Date(+year, month - 1, +day);
+            [day, month, year] = req.query.pickupEnd.split('/');
+            let endIs = new Date(+year, month - 1, +day);
+            if (startIs != undefined && isNaN(startIs) == false && endIs != undefined && isNaN(endIs) == false) {
+                let array = getDateArray(startIs, endIs);
+                anotherMatch.push({
+                    pickup: { $in: array }
+                });
+            }
+            else {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "please pass valid dates" });
+            }
+        }
+        console.log(anotherMatch);
+        if ('deliveryTimeId' in req.query) {
+            anotherMatch.push({ deliveryTimeId: mongoose.Types.ObjectId(deliveryTimeId) });
+        }
+        if ('pickupTimeId' in req.query) {
+            anotherMatch.push({ pickupTimeId: mongoose.Types.ObjectId(pickupTimeId) });
+        }
+        if (orderId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(orderId)
+            })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await invoiceSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $lookup: {
+                    from: "times",
+                    let: { deliveryId: "$deliveryTimeId", pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$deliveryId"] } } }],
+                    as: "deliveryTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "times",
+                    let: { pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$pickupId"] } } }],
+                    as: "pickupTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    let: { userId: "$userId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }],
+                    as: "userData"
+                }
+            },
+            {
+                $addFields: {
+                    invoiceId: "$orderId",
+                    paymentStatus: { $cond: { if: { $and: [{ $isArray: "$paymentId" }, { $gte: [{ $size: "$paymentId" }, 1] }] }, then: 1, else: 0 } },
+                    invoiceStatus: "$status",
+                    amount: "$orderAmount",
+                    name: { $first: "$userData.name" },
+                    deliveryTime: { $concat: [{ $first: "$deliveryTime.start" }, "-", { $first: "$deliveryTime.end" }] },
+                    pickupTime: { $concat: [{ $first: "$pickupTime.start" }, "-", { $first: "$pickupTime.end" }] }
+                }
+            },
+
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    userData: 0,
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `invoice order found` : "no any invoice orders found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     try {
         const { userId } = req.query;
@@ -746,129 +1172,129 @@ router.get('/getAdminUsers', authenticateToken, checkUserRole(['superAdmin', 'ad
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.get('/invoiceList', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
-    try {
-        let invoiceList = [{
-            'id': '632e886fc7d5ed3d874a80a2',
-            'invoiceId': '1234560'
-            , 'name': 'name'
-            , 'userId': '632e886fc7d5ed3d874a80a2'
-            , 'isSubscribed': true
-            , 'paymentStatus': 0
-            , 'invoiceStatus': 1
-            , 'amount': 2000
-            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
-            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
-        }, {
-            'id': '632e886fc7d5ed3d874a80a2',
-            'invoiceId': '1234560'
-            , 'name': 'name'
-            , 'userId': '632e886fc7d5ed3d874a80a2'
-            , 'isSubscribed': true
-            , 'paymentStatus': 1
-            , 'invoiceStatus': 0
-            , 'amount': 5000
-            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
-            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
-        }, {
-            'id': '632e886fc7d5ed3d874a80a2',
-            'invoiceId': '1234560'
-            , 'name': 'name'
-            , 'userId': '632e886fc7d5ed3d874a80a2'
-            , 'isSubscribed': true
-            , 'paymentStatus': 0
-            , 'invoiceStatus': 3
-            , 'amount': 2000
-            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
-            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
-        }, {
-            'id': '632e886fc7d5ed3d874a80a2',
-            'invoiceId': '1234560'
-            , 'name': 'name'
-            , 'userId': '632e886fc7d5ed3d874a80a2'
-            , 'isSubscribed': true
-            , 'paymentStatus': 0
-            , 'invoiceStatus': 1
-            , 'amount': 4400
-            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
-            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
-        }, {
-            'id': '632e886fc7d5ed3d874a80a2',
-            'invoiceId': '1234560'
-            , 'name': 'name'
-            , 'userId': '632e886fc7d5ed3d874a80a2'
-            , 'isSubscribed': true
-            , 'paymentStatus': 0
-            , 'invoiceStatus': 1
-            , 'amount': 3000
-            , 'createdAt': '2022-10-03T07:10:28.789+00:00'
-            , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
-        }]
-        // const { userId } = req.body;
-        // let match;
-        // let anotherMatch = [];
-        // if ('name' in req.query) {
-        //     let regEx = new RegExp(req.query.name, 'i')
-        //     anotherMatch.push({ name: { $regex: regEx } })
-        // }
-        // if ('role' in req.query) {
-        //     anotherMatch.push({ role: req.query.role })
-        // }
-        // if ('status' in req.query) {
-        //     anotherMatch.push({ status: parseInt(req.query.status) });
-        // }
-        // if (userId != undefined) {
-        //     anotherMatch.push({
-        //         _id: mongoose.Types.ObjectId(userId)
-        //     })
-        // }
-        // console.log(anotherMatch);
-        // if (anotherMatch.length > 0) {
-        //     match = {
-        //         $match: {
-        //             $and: anotherMatch
-        //         }
-        //     }
-        // }
-        // else {
-        //     match = {
-        //         $match: {
+// router.get('/invoiceList', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+//     try {
+//         let invoiceList = [{
+//             'id': '632e886fc7d5ed3d874a80a2',
+//             'invoiceId': '1234560'
+//             , 'name': 'name'
+//             , 'userId': '632e886fc7d5ed3d874a80a2'
+//             , 'isSubscribed': true
+//             , 'paymentStatus': 0
+//             , 'invoiceStatus': 1
+//             , 'amount': 2000
+//             , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+//             , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+//         }, {
+//             'id': '632e886fc7d5ed3d874a80a2',
+//             'invoiceId': '1234560'
+//             , 'name': 'name'
+//             , 'userId': '632e886fc7d5ed3d874a80a2'
+//             , 'isSubscribed': true
+//             , 'paymentStatus': 1
+//             , 'invoiceStatus': 0
+//             , 'amount': 5000
+//             , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+//             , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+//         }, {
+//             'id': '632e886fc7d5ed3d874a80a2',
+//             'invoiceId': '1234560'
+//             , 'name': 'name'
+//             , 'userId': '632e886fc7d5ed3d874a80a2'
+//             , 'isSubscribed': true
+//             , 'paymentStatus': 0
+//             , 'invoiceStatus': 3
+//             , 'amount': 2000
+//             , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+//             , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+//         }, {
+//             'id': '632e886fc7d5ed3d874a80a2',
+//             'invoiceId': '1234560'
+//             , 'name': 'name'
+//             , 'userId': '632e886fc7d5ed3d874a80a2'
+//             , 'isSubscribed': true
+//             , 'paymentStatus': 0
+//             , 'invoiceStatus': 1
+//             , 'amount': 4400
+//             , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+//             , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+//         }, {
+//             'id': '632e886fc7d5ed3d874a80a2',
+//             'invoiceId': '1234560'
+//             , 'name': 'name'
+//             , 'userId': '632e886fc7d5ed3d874a80a2'
+//             , 'isSubscribed': true
+//             , 'paymentStatus': 0
+//             , 'invoiceStatus': 1
+//             , 'amount': 3000
+//             , 'createdAt': '2022-10-03T07:10:28.789+00:00'
+//             , 'updatedAt': '2022-10-03T07:10:28.789+00:00'
+//         }]
+//         // const { userId } = req.body;
+//         // let match;
+//         // let anotherMatch = [];
+//         // if ('name' in req.query) {
+//         //     let regEx = new RegExp(req.query.name, 'i')
+//         //     anotherMatch.push({ name: { $regex: regEx } })
+//         // }
+//         // if ('role' in req.query) {
+//         //     anotherMatch.push({ role: req.query.role })
+//         // }
+//         // if ('status' in req.query) {
+//         //     anotherMatch.push({ status: parseInt(req.query.status) });
+//         // }
+//         // if (userId != undefined) {
+//         //     anotherMatch.push({
+//         //         _id: mongoose.Types.ObjectId(userId)
+//         //     })
+//         // }
+//         // console.log(anotherMatch);
+//         // if (anotherMatch.length > 0) {
+//         //     match = {
+//         //         $match: {
+//         //             $and: anotherMatch
+//         //         }
+//         //     }
+//         // }
+//         // else {
+//         //     match = {
+//         //         $match: {
 
-        //         }
-        //     }
-        // }
-        // let getUsers = await adminSchema.aggregate([
-        //     match,
-        //     {
-        //         $addFields: {
-        //             id: "$_id"
-        //         }
-        //     },
-        //     {
-        //         $project: {
-        //             __v: 0,
-        //             _id: 0,
-        //             password: 0,
-        //             otp: 0,
-        //             generatedTime: 0,
-        //             createdAt: 0,
-        //             updatedAt: 0
-        //         }
-        //     },
-        //     {
-        //         $addFields: {
-        //             country: "Usa",
-        //             mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
-        //             email: { $ifNull: ["$email", "Unspecified"] },
-        //             status: { $ifNull: ["$status", 0] }
-        //         }
-        //     }
-        // ])
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: invoiceList }, message: invoiceList.length > 0 ? `invoice found` : "no invoice found" });
-    } catch (error) {
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
+//         //         }
+//         //     }
+//         // }
+//         // let getUsers = await adminSchema.aggregate([
+//         //     match,
+//         //     {
+//         //         $addFields: {
+//         //             id: "$_id"
+//         //         }
+//         //     },
+//         //     {
+//         //         $project: {
+//         //             __v: 0,
+//         //             _id: 0,
+//         //             password: 0,
+//         //             otp: 0,
+//         //             generatedTime: 0,
+//         //             createdAt: 0,
+//         //             updatedAt: 0
+//         //         }
+//         //     },
+//         //     {
+//         //         $addFields: {
+//         //             country: "Usa",
+//         //             mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+//         //             email: { $ifNull: ["$email", "Unspecified"] },
+//         //             status: { $ifNull: ["$status", 0] }
+//         //         }
+//         //     }
+//         // ])
+//         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: invoiceList }, message: invoiceList.length > 0 ? `invoice found` : "no invoice found" });
+//     } catch (error) {
+//         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+//     }
+// })
 router.get('/paymentList', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     try {
         let invoiceList = [{

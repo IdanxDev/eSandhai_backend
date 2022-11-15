@@ -1418,9 +1418,9 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addOrder', async (req, res, next) => {
+router.post('/addOrder', authenticateToken, async (req, res, next) => {
     try {
-        const { delivery, pickup, deliveryTimeId, pickupTimeId, status, items } = req.body;
+        const { delivery, pickup, deliveryTimeId, pickupTimeId, status, addressId, items } = req.body;
         const userId = req.user._id;
         let checkSubscription = await checkUserSubscriptionMember(userId);
         let totalAmount = 0;
@@ -1428,9 +1428,11 @@ router.post('/addOrder', async (req, res, next) => {
         let orderId = makeid(12);
         if (items != undefined && items != null) {
             for (i = 0; i < items.length; i++) {
-                totalAmount += items.amount;
+                totalAmount += (items[i].amount * items[i].qty);
+                console.log(totalAmount);
             }
         }
+        console.log(totalAmount);
         let addOrder = new invoiceSchema({
             delivery: delivery,
             pickup: pickup,
@@ -1439,6 +1441,7 @@ router.post('/addOrder', async (req, res, next) => {
             orderId: orderId,
             deliveryTimeId: deliveryTimeId,
             pickupTimeId: pickupTimeId,
+            addressId: addressId,
             isSubscribed: checkSubscription.isSubscribed,
             isMember: checkSubscription.isMember,
             orderAmount: totalAmount,
@@ -1446,8 +1449,9 @@ router.post('/addOrder', async (req, res, next) => {
         })
         await addOrder.save();
         if (items != undefined && items != null) {
+            console.log(addOrder);
             for (i = 0; i < items.length; i++) {
-                itemsDoc.push({ itemId: items.itemId, qty: items.qty, amount: items.amount, categoryId: items.categoryId, orderId: addOrder._id })
+                itemsDoc.push({ itemId: items[i].itemId, qty: items[i].qty, amount: (items[i].amount * items[i].qty), categoryId: items[i].categoryId, orderId: addOrder._id })
             }
         }
         if (itemsDoc.length > 0) {
@@ -1460,23 +1464,26 @@ router.post('/addOrder', async (req, res, next) => {
         delete addOrder._doc.__v;
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addOrder }, message: 'order added' });
     }
-    catch (err) {
+    catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addOrderItem', async (req, res, next) => {
+router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
     try {
         const { qty, amount, itemId, categoryId, orderId } = req.body;
         const userId = req.user._id;
         let checkItems = await orderItems.findOne({ itemId: mongoose.Types.ObjectId(itemId), orderId: mongoose.Types.ObjectId(orderId) });
         if (checkItems != null && checkItems != undefined) {
-            let updateQty = await orderItems.findByIdAndUpdate(checkItems._id, { qty: { $inc: qty } }, { new: true })
+            let finalAmount = (qty * amount);
+            console.log(qty + "  " + amount);
+            let updateQty = await orderItems.findByIdAndUpdate(checkItems._id, { $inc: { qty: qty, amount: finalAmount } }, { new: true })
+            let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount } }, { new: true });
             updateQty._doc['id'] = updateQty._doc['_id'];
             delete updateQty._doc.updatedAt;
             delete updateQty._doc.createdAt;
             delete updateQty._doc._id;
             delete updateQty._doc.__v;
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateQty }, message: 'items updated' });
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateQty }, message: 'order items updated' });
         }
         let addItem = new orderItems({
             qty: qty,
@@ -1486,6 +1493,8 @@ router.post('/addOrderItem', async (req, res, next) => {
             orderId: orderId
         })
         await addItem.save();
+        let finalAmount = qty * amount;
+        let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount } }, { new: true });
         addItem._doc['id'] = addItem._doc['_id'];
         delete addItem._doc.updatedAt;
         delete addItem._doc.createdAt;
@@ -1493,11 +1502,65 @@ router.post('/addOrderItem', async (req, res, next) => {
         delete addItem._doc.__v;
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addItem }, message: 'order item added' });
     }
-    catch (err) {
+    catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.put('/updateOrder', authenticateToken, authenticateToken, async (req, res, next) => {
+    try {
+        const { addressId, status, orderId, paymentId, note } = req.body;
+        let checkOrder = await invoiceSchema.findById(orderId);
+        if (checkOrder != undefined && checkOrder != null) {
+            let update = {
+                status: status,
+                addressId: addressId,
+                paymentId: paymentId,
+                note: note
+            }
+            let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, update, { new: true });
+            updateOrder._doc['id'] = updateOrder._doc['_id'];
+            delete updateOrder._doc.updatedAt;
+            delete updateOrder._doc.createdAt;
+            delete updateOrder._doc._id;
+            delete updateOrder._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
 
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
+    }
+    catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+// router.put('/updateOrderStatus', async (req, res, next) => {
+//     try {
+//         const { delivery, pickup, deliveryTimeId, pickupTimeId, status, orderId, paymentId, note } = req.body;
+//         let checkOrder = await invoiceSchema.findById(orderId);
+//         if (checkOrder != undefined && checkOrder != null) {
+//             let update = {
+//                 delivery: delivery,
+//                 pickup: pickup,
+//                 deliveryTimeId: deliveryTimeId,
+//                 pickupTimeId: pickupTimeId,
+//                 status: status,
+//                 paymentId: paymentId,
+//                 note: note
+//             }
+//             let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, update, { new: true });
+//             updateOrder._doc['id'] = updateOrder._doc['_id'];
+//             delete updateOrder._doc.updatedAt;
+//             delete updateOrder._doc.createdAt;
+//             delete updateOrder._doc._id;
+//             delete updateOrder._doc.__v;
+//             return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+
+//         }
+//         return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
+//     }
+//     catch (err) {
+//         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+//     }
+// })
 router.get('/checkSubscriptionMember', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id

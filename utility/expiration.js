@@ -92,6 +92,15 @@ exports.checkExpireMemberShip = async () => {
         }
     }
 }
+exports.getDateArray = (start, end) => {
+    var arr = new Array();
+    var dt = new Date(start);
+    while (dt <= end) {
+        arr.push(`${new Date(dt).getDate()}/${new Date(dt).getMonth() + 1}/${new Date(dt).getFullYear()}`);
+        dt.setDate(dt.getDate() + 1);
+    }
+    return arr;
+}
 exports.checkUserSubscriptionMember = async (userId) => {
     let checkUser = await userModel.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }, {
         $lookup: {
