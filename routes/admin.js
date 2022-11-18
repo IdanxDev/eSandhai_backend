@@ -354,12 +354,13 @@ router.post('/resendOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+
 router.post('/resendOtpUsingId', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id;
         const { id } = req.body;
         console.log(userId);
-        let checkOtp = await userSchema.aggregate([
+        let checkOtp = await adminSchema.aggregate([
             {
                 $match: {
                     _id: mongoose.Types.ObjectId(userId)
@@ -373,7 +374,7 @@ router.post('/resendOtpUsingId', authenticateToken, async (req, res, next) => {
         otp = getRandomIntInclusive(111111, 999999);
         res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: otp }, message: "Otp sent successfully" });
 
-        let update = await userSchema.findByIdAndUpdate(checkOtp[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+        let update = await adminSchema.findByIdAndUpdate(checkOtp[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
         let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
 
         if (validateEmail(id)) {
