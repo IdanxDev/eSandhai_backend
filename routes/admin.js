@@ -354,6 +354,42 @@ router.post('/resendOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/resendOtpUsingId', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const { id } = req.body;
+        console.log(userId);
+        let checkOtp = await userSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
+            }
+        ])
+        if (checkOtp.length == 0) {
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false }, message: "no user found with this ids" });
+        }
+
+        otp = getRandomIntInclusive(111111, 999999);
+        res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: otp }, message: "Otp sent successfully" });
+
+        let update = await userSchema.findByIdAndUpdate(checkOtp[0]._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+        let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome back!</p><br>Your otp is ${otp} , Please Do not share this otp with anyone<br/> This otp is valid for one minute only`
+
+        if (validateEmail(id)) {
+            await main(checkOtp[0].email, message);
+        }
+        else if (validatePhoneNumber(id)) {
+            await sendSms(checkOtp[0].countryCode + checkOtp[0].mobileNo, `Helllo User, Your otp for laundary service is ${otp} , Please Do not share this otp with anyone`);
+        }
+        return
+
+        return res.status(200).json({ IsSuccess: true, Data: [], Messsage: "user not found" });
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 //authenticate otp and update for verified status
 router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"), body('otp').isNumeric().withMessage("please pass otp")], checkErr, async (req, res, next) => {
     try {
@@ -919,7 +955,6 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
                     pickupTime: { $concat: [{ $first: "$pickupTime.start" }, "-", { $first: "$pickupTime.end" }] }
                 }
             },
-
             {
                 $addFields: {
                     createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
