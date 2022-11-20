@@ -391,6 +391,131 @@ router.post('/resendOtpUsingId', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getAnalytics', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
+    try {
+        const userId = req.user._id
+
+        return res.status(200).json({
+            "issuccess": true,
+            "data": {
+                "acknowledgement": true,
+                "data": [
+                    {
+                        "year": "2022",
+                        "completedDelivery": "1.23K",
+                        "completedPickUp": "568",
+                        "pendingDelivery": "1.23K",
+                        "pendingPickUp": "568",
+                        "cancelledDelivery": "1.23K",
+                        "cancelledPickUp": "568",
+                        "salesOverview": [
+                            {
+                                "totalSales": "52.3K",
+                                "isIncrease": true,
+                                "percent": "20",
+                                "data": [
+                                    {
+                                        "title": "Customer",
+                                        "stats": "2048"
+                                    },
+                                    {
+                                        "title": "totalProfit",
+                                        "stats": "20K"
+                                    },
+                                    {
+                                        "title": "transaction",
+                                        "stats": "2546K"
+                                    }
+                                ]
+                            }
+                        ],
+                        "male": "200",
+                        "female": "100",
+                        "weeklySalesSeries": [
+                            {
+                                "data": [
+                                    0,
+                                    2,
+                                    3,
+                                    10,
+                                    15,
+                                    12,
+                                    18,
+                                    20
+                                ]
+                            }
+                        ],
+                        "monthlySalesSeries": [
+                            {
+                                "data": [
+                                    2,
+                                    4,
+                                    6,
+                                    4,
+                                    10,
+                                    18,
+                                    15,
+                                    19
+                                ]
+                            }
+                        ],
+                        "yearlySalesSeries": [
+                            {
+                                "data": [
+                                    1,
+                                    4,
+                                    7,
+                                    10,
+                                    15,
+                                    18,
+                                    14,
+                                    20
+                                ]
+                            }
+                        ],
+                        "WeeklyTransaction": [
+                            {
+                                "name": "Last Week",
+                                "data": [
+                                    83,
+                                    153,
+                                    213,
+                                    279,
+                                    213,
+                                    153,
+                                    83
+                                ]
+                            },
+                            {
+                                "name": "This Week",
+                                "data": [
+                                    -84,
+                                    -156,
+                                    -216,
+                                    -282,
+                                    -216,
+                                    -156,
+                                    -84
+                                ]
+                            }
+                        ],
+                        "transactionReport": [
+                            {
+                                "lastMonthTransactin": "749.30K",
+                                "currentWeek": "+81.46%",
+                                "lastWeek": "-24.30%",
+                                "performance": "+88.70%"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "message": "data found"
+        })
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 //authenticate otp and update for verified status
 router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"), body('otp').isNumeric().withMessage("please pass otp")], checkErr, async (req, res, next) => {
     try {
