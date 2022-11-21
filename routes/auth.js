@@ -25,6 +25,8 @@ const membershipDetails = require('../models/membershipDetails');
 const membershipSchema = require('../models/membershipSchema');
 const invoiceSchema = require('../models/invoiceSchema');
 const orderItems = require('../models/orderItems');
+const { query } = require('express');
+const apkLinkSchema = require('../models/apkLinkSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -873,6 +875,29 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
             return res.status(410).json({ issuccess: true, data: { acknowledgement: false, status: 1 }, message: `otp expired` });
         }
 
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getApkLink', authenticateToken, [check("mobileNo", "please enter mobile no").isString().notEmpty(), check("countryCode", "please enter country code").isString().notEmpty()], checkErr, async (req, res) => {
+    try {
+        const { mobileNo, countryCode } = req.query
+        let getUsers = await apkLinkSchema.aggregate([
+
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                }
+            }
+        ])
+        await sendSms(countryCode + mobileNo, `Hello User , Welcome to Delux cleaning system  here is our apk link you can check it out ${getUsers[0].apkLink}`);
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

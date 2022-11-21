@@ -32,6 +32,7 @@ const membershipDetails = require('../models/membershipDetails');
 const couponSchema = require('../models/couponSchema');
 const invoiceSchema = require('../models/invoiceSchema');
 const { getDateArray } = require('../utility/expiration');
+const apkLinkSchema = require('../models/apkLinkSchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -399,8 +400,7 @@ router.get('/getAnalytics', authenticateToken, checkUserRole(['superAdmin', 'adm
             "issuccess": true,
             "data": {
                 "acknowledgement": true,
-                "data":
-                {
+                "data": {
                     "year": "2022",
                     "completedDelivery": "1.23K",
                     "completedPickUp": "568",
@@ -408,29 +408,28 @@ router.get('/getAnalytics', authenticateToken, checkUserRole(['superAdmin', 'adm
                     "pendingPickUp": "568",
                     "cancelledDelivery": "1.23K",
                     "cancelledPickUp": "568",
-                    "salesOverview": [
-                        {
-                            "totalSales": "52.3K",
-                            "isIncrease": true,
-                            "percent": "20",
-                            "data": [
-                                {
-                                    "title": "Customer",
-                                    "stats": "2048"
-                                },
-                                {
-                                    "title": "totalProfit",
-                                    "stats": "20K"
-                                },
-                                {
-                                    "title": "transaction",
-                                    "stats": "2546K"
-                                }
-                            ]
-                        }
-                    ],
+                    "salesOverview": {
+                        "totalSales": "52.3K",
+                        "isIncrease": true,
+                        "percent": "20",
+                        "data": [
+                            {
+                                "title": "Customer",
+                                "stats": "2048"
+                            },
+                            {
+                                "title": "totalProfit",
+                                "stats": "20K"
+                            },
+                            {
+                                "title": "transaction",
+                                "stats": "2546K"
+                            }
+                        ]
+                    },
                     "male": "200",
                     "female": "100",
+                    "salesThisWeek": "123k",
                     "weeklySalesSeries": [
                         {
                             "data": [
@@ -445,6 +444,7 @@ router.get('/getAnalytics', authenticateToken, checkUserRole(['superAdmin', 'adm
                             ]
                         }
                     ],
+                    "salesThisMonth": "456k",
                     "monthlySalesSeries": [
                         {
                             "data": [
@@ -459,6 +459,7 @@ router.get('/getAnalytics', authenticateToken, checkUserRole(['superAdmin', 'adm
                             ]
                         }
                     ],
+                    "salesThisYear": "789k",
                     "yearlySalesSeries": [
                         {
                             "data": [
@@ -499,14 +500,12 @@ router.get('/getAnalytics', authenticateToken, checkUserRole(['superAdmin', 'adm
                             ]
                         }
                     ],
-                    "transactionReport": [
-                        {
-                            "lastMonthTransactin": "749.30K",
-                            "currentWeek": "+81.46%",
-                            "lastWeek": "-24.30%",
-                            "performance": "+88.70%"
-                        }
-                    ]
+                    "transactionReport": {
+                        "lastMonthTransactin": "749.30K",
+                        "currentWeek": "+81.46%",
+                        "lastWeek": "-24.30%",
+                        "performance": "+88.70%"
+                    }
                 }
             },
             "message": "data found"
@@ -1645,6 +1644,59 @@ router.get('/getRiders', authenticateToken, checkUserRole(['superAdmin', 'admin'
             }
         ])
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `admin users found` : "no user found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+
+router.post('/addApkLink', authenticateToken, checkUserRole(['superAdmin']), [body("apkLink", "please add apkLink").isString().notEmpty()], checkErr, async (req, res) => {
+    try {
+        const { apkLink } = req.body;
+        let getApkLinks = await apkLinkSchema.aggregate([
+            {
+                $match: {
+                    apkLink: apkLink
+                }
+            }
+        ]);
+        if (getApkLinks.length > 0) {
+            let addApkLink = await apkLinkSchema.findByIdAndUpdate(getApkLinks[0]._id, { apkLink: apkLink }, { new: true });
+            console.log(addApkLink);
+            addApkLink._doc['id'] = addApkLink._doc['_id'];
+            delete addApkLink._doc.__v;
+            delete addApkLink._doc._id;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addApkLink }, message: `link successfully updated` });
+        }
+        let addApkLink = new apkLinkSchema({
+            apkLink: apkLink
+        });
+        await addApkLink.save();
+        addApkLink._doc['id'] = addApkLink._doc['_id'];
+        delete addApkLink._doc.__v;
+        delete addApkLink._doc._id;
+
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addApkLink }, message: `link successfully added` });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getApkLink', authenticateToken, async (req, res) => {
+    try {
+        let getUsers = await apkLinkSchema.aggregate([
+
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
