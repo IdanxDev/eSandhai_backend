@@ -128,6 +128,9 @@ exports.checkUserSubscriptionMember = async (userId) => {
             }
         }
     }])
-
-    return checkUser;
+    console.log(checkUser);
+    if (checkUser.length > 0) {
+        return checkUser;
+    }
+    return [{ isSubscription: false, isMember: false }]
 }

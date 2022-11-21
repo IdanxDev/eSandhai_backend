@@ -19,6 +19,7 @@ const { checkErr } = require('../../utility/error');
 const userSubscription = require('../../models/userSubscription');
 const subscriptionSchema = require('../../models/subscriptionSchema');
 const bodySchema = require('../../models/bodySchema');
+const { checkUserSubscriptionMember } = require('../../utility/expiration');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -561,7 +562,15 @@ router.post('/authenticateOtpLogin', [oneOf([body('id').isEmail(), body('id').is
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-
+router.get('/checkSubscriptionMember', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        let checkSubscription = await checkUserSubscriptionMember(userId)
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkSubscription }, message: "user subscription status found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 //return response for otp verification only
 router.post('/authenticateOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no"), body('otp').isNumeric().withMessage("please pass otp")], checkErr, async (req, res, next) => {
     try {

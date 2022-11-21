@@ -15,6 +15,10 @@ const invoiceSchema = mongoose.Schema({
         type: mongoose.Types.ObjectId,
         ref: "users"
     },
+    //0==initiated
+    //1==pending
+    //2==processing
+    //3==completed
     status: {
         type: Number,
         default: 0

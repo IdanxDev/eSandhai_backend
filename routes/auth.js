@@ -534,6 +534,234 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
 //         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
 //     }
 // })
+router.get('/getOrdersCount', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        let getPendingOrder = await invoiceSchema.aggregate([
+            {
+                $match: {
+                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 2 }]
+                }
+            }
+        ])
+        let getCompletedOrder = await invoiceSchema.aggregate([
+            {
+                $match: {
+                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 3 }]
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { pending: getPendingOrder.length, completed: getCompletedOrder.length } }, message: "order count found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    try {
+        const { orderId } = req.query;
+        const userId = req.user._id;
+        let match;
+        let anotherMatch = [];
+        // if ('name' in req.query) {
+        //     let regEx = new RegExp(req.query.name, 'i')
+        //     anotherMatch.push({ name: { $regex: regEx } })
+        // }
+        anotherMatch.push({ userId: mongoose.Types.ObjectId(userId) })
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if ('deliveryStart' in req.query && 'deliveryEnd' in req.query) {
+            let [day, month, year] = req.query.deliveryStart.split('/');
+            let startIs = new Date(+year, month - 1, +day);
+            [day, month, year] = req.query.deliveryEnd.split('/');
+            let endIs = new Date(+year, month - 1, +day);
+            console.log(startIs + " " + endIs);
+            if (startIs != undefined && isNaN(startIs) == false && endIs != undefined && isNaN(endIs) == false) {
+                let array = getDateArray(startIs, endIs);
+                console.log(array);
+                anotherMatch.push({
+                    delivery: { $in: array }
+                });
+            }
+            else {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "please pass valid dates" });
+            }
+        }
+        if ('pickupStart' in req.query && 'pickupEnd' in req.query) {
+            let [day, month, year] = req.query.pickupStart.split('/');
+            let startIs = new Date(+year, month - 1, +day);
+            [day, month, year] = req.query.pickupEnd.split('/');
+            let endIs = new Date(+year, month - 1, +day);
+            if (startIs != undefined && isNaN(startIs) == false && endIs != undefined && isNaN(endIs) == false) {
+                let array = getDateArray(startIs, endIs);
+                anotherMatch.push({
+                    pickup: { $in: array }
+                });
+            }
+            else {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "please pass valid dates" });
+            }
+        }
+        console.log(anotherMatch);
+        if ('deliveryTimeId' in req.query) {
+            anotherMatch.push({ deliveryTimeId: mongoose.Types.ObjectId(deliveryTimeId) });
+        }
+        if ('pickupTimeId' in req.query) {
+            anotherMatch.push({ pickupTimeId: mongoose.Types.ObjectId(pickupTimeId) });
+        }
+        if (orderId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(orderId)
+            })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await invoiceSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $lookup: {
+                    from: "times",
+                    let: { deliveryId: "$deliveryTimeId", pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$deliveryId"] } } }],
+                    as: "deliveryTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "times",
+                    let: { pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$pickupId"] } } }],
+                    as: "pickupTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    let: { userId: "$userId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }],
+                    as: "userData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: { addressId: "$addressId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "addressData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "orderitems",
+                    let: { id: "$_id" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$orderId", "$$id"] } } },
+                        {
+                            $lookup:
+                            {
+                                from: "categories",
+                                let: { categoryId: "$categoryId" },
+                                pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$categoryId"] } } }, { $addFields: { id: "$_id" } }, { $project: { _id: 0, __v: 0 } }],
+                                as: "categoryData"
+                            }
+                        },
+                        {
+                            $addFields: {
+                                categoryName: { $first: "$categoryData" },
+                                id: "$_id"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0, __v: 0
+                            }
+                        },
+                        {
+                            $lookup:
+                            {
+                                from: "items",
+                                let: { id: "$itemId" },
+                                pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$id"] } } }, { $addFields: { id: "$_id" } }, { $project: { _id: 0, __v: 0 } }],
+                                as: "itemData"
+                            }
+                        }, {
+                            $addFields: {
+                                itemData: { $first: "$itemData" }
+                            }
+                        },
+                    ],
+                    as: "ordermItems"
+                }
+            },
+            {
+                $addFields: {
+                    invoiceId: "$orderId",
+                    paymentStatus: { $cond: { if: { $and: [{ $isArray: "$paymentId" }, { $gte: [{ $size: "$paymentId" }, 1] }] }, then: 1, else: 0 } },
+                    invoiceStatus: "$status",
+                    amount: "$orderAmount",
+                    name: { $first: "$userData.name" },
+                    addressData: { $first: "$addressData" },
+                    deliveryTime: { $concat: [{ $first: "$deliveryTime.start" }, "-", { $first: "$deliveryTime.end" }] },
+                    pickupTime: { $concat: [{ $first: "$pickupTime.start" }, "-", { $first: "$pickupTime.end" }] }
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    userData: 0,
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `invoice order found` : "no any invoice orders found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getDetails', async (req, res, next) => {
     try {
         const { status } = req.query;
@@ -883,7 +1111,6 @@ router.get('/getApkLink', authenticateToken, [check("mobileNo", "please enter mo
     try {
         const { mobileNo, countryCode } = req.query
         let getUsers = await apkLinkSchema.aggregate([
-
             {
                 $addFields: {
                     "id": "$_id"
