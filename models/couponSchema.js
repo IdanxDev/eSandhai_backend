@@ -4,6 +4,10 @@ const couponSchema = mongoose.Schema({
         type: String,
         default: ""
     },
+    description: {
+        type: String,
+        default: ""
+    },
     discount: {
         type: Number,
         default: 0

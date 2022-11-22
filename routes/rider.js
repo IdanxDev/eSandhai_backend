@@ -593,9 +593,7 @@ router.get('/getUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']
                     _id: 0,
                     password: 0,
                     otp: 0,
-                    generatedTime: 0,
-                    createdAt: 0,
-                    updatedAt: 0
+                    generatedTime: 0
                 }
             },
             {
@@ -603,6 +601,28 @@ router.get('/getUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']
                     country: "Usa",
                     mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
                     email: { $ifNull: ["$email", "Unspecified"] }
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
                 }
             }
         ])

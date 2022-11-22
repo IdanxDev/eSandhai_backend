@@ -2116,7 +2116,7 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            let { name, start, discount, end, isVisible } = req.body;
+            let { name, description, start, discount, end, isVisible } = req.body;
 
             let checkCategory = await couponSchema.findOne({ name: name });
 
@@ -2130,6 +2130,7 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
             console.log(startIs);
             let addCategory = new couponSchema({
                 name: name,
+                description: description,
                 start: startIs,
                 end: endIs,
                 discount: discount,
@@ -2155,7 +2156,8 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body('couponId', "please pass valid coupon id").custom((value) => mongoose.Types.ObjectId.isValid(value))
     ], checkErr, checkErr, async (req, res) => {
         try {
-            const { name, discount, start, end, isVisible, couponId } = req.body;
+            const { name,
+                description, discount, start, end, isVisible, couponId } = req.body;
 
             let checkCategory = await couponSchema.findById(couponId);
             if (checkCategory == undefined || checkCategory == null) {
@@ -2171,6 +2173,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
             console.log(startIs);
             let addCategory = {
                 name: name,
+                description: description,
                 start: startIs,
                 discount: discount,
                 end: endIs,
@@ -2194,6 +2197,19 @@ router.get('/getCoupons', authenticateToken, async (req, res) => {
     try {
         let match;
         let anotherMatch = [];
+        let getCategory = await categorySchema.aggregate([{ $match: {} }]);
+        if (getCategory.length > 0) {
+            for (i = 0; i < getCategory.length; i++) {
+                // console.log(getCategory[i]);
+                let remove = await categorySchema.findByIdAndRemove(getCategory[i]._id)
+            }
+        }
+        getCategory = await itemSchema.aggregate([{ $match: {} }]);
+        if (getCategory.length > 0) {
+            for (i = 0; i < getCategory.length; i++) {
+                let remove = await itemSchema.findByIdAndRemove(getCategory[i]._id)
+            }
+        }
         if ('name' in req.query) {
             let regEx = new RegExp(req.query.name, 'i')
             anotherMatch.push({ name: { $regex: regEx } })
