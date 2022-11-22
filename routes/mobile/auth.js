@@ -298,14 +298,18 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
         }
 
+        let addArray = [];
         if (email != undefined || mobileNo != undefined) {
+            if (email != undefined) {
+                addArray.push({ email: email })
+            }
+            if (mobileNo != undefined) {
+                addArray.push({ mobileNo: mobileNo })
+            }
             let checkEmail = await userSchema.aggregate([
                 {
                     $match: {
-                        $or: [
-                            { email: email },
-                            { mobileNo: mobileNo }
-                        ]
+                        $or: addArray
                     }
                 }
             ])

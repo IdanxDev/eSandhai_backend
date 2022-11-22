@@ -8,6 +8,7 @@ const { default: mongoose } = require('mongoose');
 const userSchema = require('../models/userModel');
 const { getCurrentDateTime24, makeid } = require('../utility/dates');
 const nodemailer = require("nodemailer");
+const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember } = require('../utility/expiration');
 var admin = require('../utility/setup/firebase-admin');
 const { getAuth } = require("firebase-admin/auth");
@@ -352,20 +353,25 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         if (otp == undefined && (email != undefined || mobileNo != undefined)) {
             return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
         }
-
+        let addArray = [];
         if (email != undefined || mobileNo != undefined) {
+            if (email != undefined) {
+                addArray.push({ email: email })
+            }
+            if (mobileNo != undefined) {
+                addArray.push({ mobileNo: mobileNo })
+            }
             let checkEmail = await userSchema.aggregate([
                 {
                     $match: {
-                        $or: [
-                            { email: email },
-                            { mobileNo: mobileNo }
-                        ]
+                        $or: addArray
                     }
                 }
             ])
+            console.log(checkEmail[0]);
+            console.log(userId);
             if (checkEmail.length > 0 && checkEmail[0]._id.toString() != userId) {
-                return res.status(403).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
+                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
             }
         }
         let checkUser = await userSchema.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }]);
