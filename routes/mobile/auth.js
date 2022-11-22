@@ -406,7 +406,7 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
         let getPendingOrder = await invoiceSchema.aggregate([
             {
                 $match: {
-                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 2 }]
+                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }]
                 }
             }
         ])
@@ -418,11 +418,12 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
             }
         ])
         let getSubscriptionDetail = await checkUserSubscriptionMember(userId)
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign({ pendingOrder: getPendingOrder.length, completeOrder: getCompletedOrder.length }, checkUser[0], { isSubscription: getSubscriptionDetail[0].isSubscription, isMember: getSubscriptionDetail[0].isMember }) }, message: "user details found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign({ pendingPickups: getPendingOrder.length, pendingDelivery: getCompletedOrder.length }, checkUser[0], { isSubscription: getSubscriptionDetail[0].isSubscription, isMember: getSubscriptionDetail[0].isMember }) }, message: "user details found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+
 router.post('/resendOtp', [oneOf([body('id').isEmail(), body('id').isMobilePhone()], "please pass email or mobile no")], checkErr, async (req, res, next) => {
     try {
         const { id } = req.body;
