@@ -20,6 +20,7 @@ const userSubscription = require('../../models/userSubscription');
 const subscriptionSchema = require('../../models/subscriptionSchema');
 const bodySchema = require('../../models/bodySchema');
 const { checkUserSubscriptionMember } = require('../../utility/expiration');
+const invoiceSchema = require('../../models/invoiceSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -402,7 +403,22 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no user details found" });
 
         }
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser[0] }, message: "user details found" });
+        let getPendingOrder = await invoiceSchema.aggregate([
+            {
+                $match: {
+                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 2 }]
+                }
+            }
+        ])
+        let getCompletedOrder = await invoiceSchema.aggregate([
+            {
+                $match: {
+                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 3 }]
+                }
+            }
+        ])
+        let getSubscriptionDetail = await checkUserSubscriptionMember(userId)
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign({ pendingOrder: getPendingOrder.length, completeOrder: getCompletedOrder.length }, checkUser[0], { isSubscription: getSubscriptionDetail[0].isSubscription, isMember: getSubscriptionDetail[0].isMember }) }, message: "user details found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
