@@ -375,7 +375,7 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
             }
         }
         let checkUser = await userSchema.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }]);
-        let updateUser = await userSchema.findByIdAndUpdate(userId, { gender: gender, name: name, birthDate: dob }, { new: true })
+        let updateUser = await userSchema.findByIdAndUpdate(userId, { gender: gender, name: name, dob: dob }, { new: true })
 
         if (otp != undefined) {
             if (otp == '000000') {
