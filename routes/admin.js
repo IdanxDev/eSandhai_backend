@@ -2197,19 +2197,6 @@ router.get('/getCoupons', authenticateToken, async (req, res) => {
     try {
         let match;
         let anotherMatch = [];
-        let getCategory = await categorySchema.aggregate([{ $match: {} }]);
-        if (getCategory.length > 0) {
-            for (i = 0; i < getCategory.length; i++) {
-                // console.log(getCategory[i]);
-                let remove = await categorySchema.findByIdAndRemove(getCategory[i]._id)
-            }
-        }
-        getCategory = await itemSchema.aggregate([{ $match: {} }]);
-        if (getCategory.length > 0) {
-            for (i = 0; i < getCategory.length; i++) {
-                let remove = await itemSchema.findByIdAndRemove(getCategory[i]._id)
-            }
-        }
         if ('name' in req.query) {
             let regEx = new RegExp(req.query.name, 'i')
             anotherMatch.push({ name: { $regex: regEx } })
@@ -2385,7 +2372,7 @@ router.delete('/removeHoliday', authenticateToken, checkUserRole(['superAdmin'])
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
-router.get('/getActiveDays', authenticateToken, checkUserRole(['superAdmin']), async (req, res) => {
+router.get('/getActiveDays', authenticateToken, async (req, res) => {
     try {
         const { date } = req.query;
         let getHoliday = await holidaySchema.findOne({ date: date });
@@ -2412,7 +2399,34 @@ router.get('/getActiveDays', authenticateToken, checkUserRole(['superAdmin']), a
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.get('/getHoliday', authenticateToken, checkUserRole(['superAdmin']), async (req, res) => {
+router.get('/getPickUpDays', authenticateToken, async (req, res) => {
+    try {
+        const { date } = req.query;
+        let getHoliday = await holidaySchema.findOne({ date: date });
+        console.log(getHoliday);
+        if (getHoliday != null && getHoliday != undefined) {
+            let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
+            console.log(checkExist);
+            if (checkExist.length > 0) {
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+            }
+            let addDay = new activeDays({ date: getHoliday.date, timeSlots: getHoliday.timeSlots, isFullHoliday: getHoliday.isFullHoliday });
+            await addDay.save();
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} status found` });
+        }
+        let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
+        if (checkExist.length > 0) {
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+        }
+        let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: true, time: { $concat: ["$start", " - ", "$end"] } } }]);
+        let addDay = new activeDays({ date: date, timeSlots: getTimeRange });
+        await addDay.save();
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} holiday successfully added` });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getHoliday', authenticateToken, async (req, res) => {
     try {
         let anotherMatch = [];
         if ('isFullHoliday' in req.query) {

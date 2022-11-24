@@ -101,6 +101,24 @@ exports.getDateArray = (start, end) => {
     }
     return arr;
 }
+exports.getNextDays = (start) => {
+    var arr = new Array();
+    var dt = new Date(start);
+    for (i = 0; i < 7; i++) {
+        arr.push(`${new Date(dt).getDate()}/${new Date(dt).getMonth() + 1}/${new Date(dt).getFullYear()}`);
+        dt.setDate(dt.getDate() + 1);
+    }
+    return arr;
+}
+exports.getNextNextDays = (start) => {
+    var arr = new Array();
+    var dt = new Date(start);
+    for (i = 0; i < 7; i++) {
+        arr.push(`${new Date(dt).getDate()}/${new Date(dt).getMonth() + 1}/${new Date(dt).getFullYear()}`);
+        dt.setDate(dt.getDate() + 1);
+    }
+    return arr;
+}
 exports.checkUserSubscriptionMember = async (userId) => {
     let checkUser = await userModel.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }, {
         $lookup: {

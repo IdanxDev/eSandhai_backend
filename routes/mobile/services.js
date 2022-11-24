@@ -11,6 +11,7 @@ const userSubscription = require('../../models/userSubscription');
 const userModel = require('../../models/userModel');
 const { checkUserSubscriptionMember } = require('../../utility/expiration');
 const membershipDetails = require('../../models/membershipDetails');
+const couponSchema = require('../../models/couponSchema');
 router.get('/getDetails', async (req, res, next) => {
     try {
         const { status } = req.query;
@@ -396,6 +397,121 @@ router.get('/getMembershipDetails', authenticateToken, async (req, res) => {
             }
         ])
         return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers[0] }, message: getUsers.length > 0 ? `subscription found` : "no subscription plan found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getCoupons', authenticateToken, async (req, res) => {
+    try {
+        let match;
+        let anotherMatch = [];
+        anotherMatch.push({ isVisible: true })
+
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('date' in req.query) {
+            let dateIs = moment(req.query.date + " 00:00:00", "DD-MM-YYYY hh:mm:ss")
+            anotherMatch.push({
+                $and: [
+                    { isExpired: false },
+                    {
+                        start: {
+                            $lte: new Date(dateIs)
+                        }
+                    },
+                    {
+                        end: {
+                            $gte: new Date(dateIs)
+                        }
+                    }
+                ]
+            })
+        }
+        if ('start' in req.query && 'end' in req.query) {
+            let startIs = moment(req.query.start + " 00:00:00", "DD-MM-YYYY hh:mm:ss")
+            let endIs = moment(req.query.end + " 00:00:00", "DD-MM-YYYY hh:mm:ss")
+            anotherMatch.push({
+                $and: [
+                    { isExpired: false },
+                    {
+                        $or: [
+                            {
+                                start: {
+                                    $gte: new Date(startIs), $lte: new Date(endIs)
+
+                                }
+                            },
+                            {
+                                end: { $gte: new Date(startIs), $lte: new Date(endIs) }
+                            }]
+                    }
+                ]
+            })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        console.log(JSON.stringify(match));
+        let getUsers = await couponSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $addFields: {
+                    startDate: { $dateToString: { format: "%d-%m-%Y", date: "$start", timezone: "-04:00" } },
+                    endDate: { $dateToString: { format: "%d-%m-%Y", date: "$end", timezone: "-04:00" } },
+                    startTime: { $dateToString: { format: "%H:%M:%S", date: "$start", timezone: "-04:00" } },
+                    endTime: { $dateToString: { format: "%H:%M:%S", date: "$end", timezone: "-04:00" } },
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] },
+                    start: { $concat: ["$startDate", " ", "$startTime"] },
+                    end: { $concat: ["$endDate", " ", "$endTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0,
+                    startDate: 0,
+                    endDate: 0,
+                    startTime: 0,
+                    endTime: 0
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: getUsers.length > 0 ? true : false, data: getUsers }, message: getUsers.length > 0 ? `coupons found` : "no any coupon found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
