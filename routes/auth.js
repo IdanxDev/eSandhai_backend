@@ -314,7 +314,7 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
         console.log(checkExist);
         if (checkExist.length > 0) {
             if (!(await bcrypt.compare(password, checkExist[0].password))) {
-                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
+                return res.status(401).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
             }
             delete checkExist[0].password;
             // let user = {
