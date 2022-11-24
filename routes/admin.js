@@ -1722,7 +1722,7 @@ router.get('/getApkLink', authenticateToken, async (req, res) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('icons').single('image'),
+router.post('/addCategory', authenticateToken, checkUserRole(['superAdmin', 'admin']), uploadProfileImageToS3('icons').single('image'),
     [body("name").isString().withMessage("please provide valid category name"),
     body('description').optional().isString().withMessage("please provide valid description"),
     body('isSubscription').isBoolean().withMessage("please provide valid subscription field"),

@@ -350,6 +350,12 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         const { name, dob, mobileNo, gender, email, otp } = req.body;
 
         const userId = req.user._id
+        let checkCategory = await userSchema.findById(mongoose.Types.ObjectId(userId));
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `user not found` });
+        }
+
         if (otp == undefined && (email != undefined || mobileNo != undefined)) {
             return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
         }

@@ -294,6 +294,11 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         const { name, dob, mobileNo, gender, email, otp } = req.body;
 
         const userId = req.user._id
+        let checkCategory = await userSchema.findById(mongoose.Types.ObjectId(userId));
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `user not found` });
+        }
         if (otp == undefined && (email != undefined || mobileNo != undefined)) {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 3 }, message: "please pass otp for update mobile no or email" });
         }
@@ -373,6 +378,140 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
         delete getUser._doc.otp;
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUser }, message: "user details updated" });
     } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+
+router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => {
+    try {
+        const { detailId, duration } = req.body;
+        const userId = req.user._id;
+        let checkCategory = await membershipDetails.findById(detailId);
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership details not found` });
+        }
+        let orderId = makeid(12);
+        let pendingDays = duration == 0 ? 28 : (duration == 1 ? (28 * 6) : 365);
+        let createAddress = new membershipSchema({
+            membershipId: detailId,
+            userId: userId,
+            price: duration == 0 ? checkCategory.month : (duration == 1 ? checkCategory.quarterly : checkCategory.year),
+            startDate: moment(),
+            endDate: moment().add(pendingDays, 'days'),
+            orderId: orderId,
+            pendingDays: pendingDays,
+            usedDays: 0
+        })
+
+        await createAddress.save();
+        createAddress._doc['id'] = createAddress._doc['_id'];
+        delete createAddress._doc.updatedAt;
+        delete createAddress._doc.createdAt;
+        delete createAddress._doc._id;
+        delete createAddress._doc.__v;
+        delete createAddress._doc.paymentId;
+        delete createAddress._doc.orderStatus;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user membership added" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateDeluxMembership', authenticateToken, async (req, res, next) => {
+    try {
+        const { membershipId, status, paymentId, note } = req.body;
+        const userId = req.user._id;
+        let checkCategory = await membershipSchema.findById(membershipId);
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership details not found` });
+        }
+        let update = {
+            paymentId: paymentId,
+            status: status,
+            note: note
+        }
+
+        let createAddress = await membershipSchema.findByIdAndUpdate(membershipId, update, { new: true });
+        createAddress._doc['id'] = createAddress._doc['_id'];
+        delete createAddress._doc.updatedAt;
+        delete createAddress._doc.createdAt;
+        delete createAddress._doc._id;
+        delete createAddress._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user membership updated" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        await checkExpireMemberShip();
+        let getAddress = await membershipSchema.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { status: { $nin: [2, 3] } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $lookup: {
+                    from: "membershipdetails",
+                    let: { id: "$membershipId" },
+                    pipeline: [{
+                        $match: {
+                            $expr: {
+                                $eq: ["$_id", "$$id"]
+                            }
+                        }
+                    },
+                    {
+                        $addFields: {
+                            "id": "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            __v: 0,
+                            isVisible: 0,
+                            createdAt: 0,
+                            updatedAt: 0
+                        }
+                    }],
+                    as: "membershipDetails"
+                }
+            },
+            {
+                $addFields: {
+                    membershipDetails: { $first: "$membershipDetails" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ]);
+
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "delux membership detail found" : "delux membership not found" });
+
+    } catch (error) {
+        console.log(error.message);
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
