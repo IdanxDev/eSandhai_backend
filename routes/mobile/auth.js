@@ -1180,6 +1180,21 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
                     as: "planDetails"
                 }
             },
+
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
             {
                 $addFields: {
                     planDetails: { $first: "$planDetails" }
@@ -1191,14 +1206,31 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
             {
                 $project: {
                     _id: 0,
-                    __v: 0,
-                    createdAt: 0,
-                    updatedAt: 0
+                    __v: 0
                 }
             }
         ]);
-
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "subscription found" : "no any active subscription" });
+        let getPickups = await userSubscription.aggregate([
+            {
+                $match: {
+                    userId: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $group:
+                {
+                    _id: {},
+                    pickup: { $sum: "$pickup" },
+                    delivery: { $sum: "$delivery" }
+                }
+            },
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress != undefined && getAddress.length > 0 ? Object.assign(getAddress[0], { pickup: getPickups[0].pickup, delivery: getPickups[0].delivery }) : [] }, message: getAddress.length > 0 ? "subscription found" : "no any active subscription" });
 
     } catch (error) {
         console.log(error.message);

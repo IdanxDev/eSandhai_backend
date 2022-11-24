@@ -2110,13 +2110,15 @@ router.put('/updateTimerange', authenticateToken, checkUserRole(['superAdmin']),
     })
 router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
     [body("name", "please provide valid name").notEmpty().isString(),
+    body("description", "please provide valid description").optional().notEmpty().isString(),
+    body("terms", "please provide valid terms").optional().notEmpty().isString(),
     body("start", "please provide start hours").notEmpty().isString(),
     body('end', "please provide ending hours").notEmpty().isString(),
     body('discount', "please provide discount value").notEmpty().isNumeric(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            let { name, description, start, discount, end, isVisible } = req.body;
+            let { name, description, start, discount, end, isVisible, terms } = req.body;
 
             let checkCategory = await couponSchema.findOne({ name: name });
 
@@ -2134,7 +2136,8 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 start: startIs,
                 end: endIs,
                 discount: discount,
-                isVisible: isVisible
+                isVisible: isVisible,
+                terms: terms
             })
 
             await addCategory.save();
@@ -2150,6 +2153,8 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
     })
 router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     [body("name", "please provide valid name").notEmpty().isString(),
+    body("description", "please provide valid description").optional().notEmpty().isString(),
+    body("terms", "please provide valid terms").optional().notEmpty().isString(),
     body("start", "please provide start hours").optional().notEmpty().isString(),
     body('end', "please provide ending hours").optional().notEmpty().isString(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
@@ -2157,7 +2162,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     ], checkErr, checkErr, async (req, res) => {
         try {
             const { name,
-                description, discount, start, end, isVisible, couponId } = req.body;
+                description, terms, discount, start, end, isVisible, couponId } = req.body;
 
             let checkCategory = await couponSchema.findById(couponId);
             if (checkCategory == undefined || checkCategory == null) {
@@ -2174,6 +2179,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
             let addCategory = {
                 name: name,
                 description: description,
+                terms: terms,
                 start: startIs,
                 discount: discount,
                 end: endIs,
@@ -2197,6 +2203,7 @@ router.get('/getCoupons', authenticateToken, async (req, res) => {
     try {
         let match;
         let anotherMatch = [];
+        await couponSchema.updateMany({}, { description: "desc", terms: "terms" }, { new: true });
         if ('name' in req.query) {
             let regEx = new RegExp(req.query.name, 'i')
             anotherMatch.push({ name: { $regex: regEx } })

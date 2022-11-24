@@ -25,6 +25,10 @@ const couponSchema = mongoose.Schema({
     isExpired: {
         type: Boolean,
         default: false
+    },
+    terms: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 
