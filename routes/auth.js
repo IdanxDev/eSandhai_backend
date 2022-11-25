@@ -28,6 +28,7 @@ const invoiceSchema = require('../models/invoiceSchema');
 const orderItems = require('../models/orderItems');
 const { query } = require('express');
 const apkLinkSchema = require('../models/apkLinkSchema');
+const bannerSchema = require('../models/bannerSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -339,6 +340,51 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
     } catch (error) {
         console.log(error.message);
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getBanner', authenticateToken, async (req, res) => {
+    try {
+        let getUsers = await bannerSchema.aggregate([
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                }
+            },
+            {
+                $sort: { priority: -1 }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: "banner not found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
 router.post('/updateUser', authenticateToken, [body('name', 'please pass valid name').optional().notEmpty().isString(),

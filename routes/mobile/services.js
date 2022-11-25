@@ -12,6 +12,7 @@ const userModel = require('../../models/userModel');
 const { checkUserSubscriptionMember } = require('../../utility/expiration');
 const membershipDetails = require('../../models/membershipDetails');
 const couponSchema = require('../../models/couponSchema');
+const bannerSchema = require('../../models/bannerSchema');
 router.get('/getDetails', async (req, res, next) => {
     try {
         const { status } = req.query;
@@ -512,6 +513,51 @@ router.get('/getCoupons', authenticateToken, async (req, res) => {
             }
         ])
         return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: getUsers.length > 0 ? true : false, data: getUsers }, message: getUsers.length > 0 ? `coupons found` : "no any coupon found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getBanner', authenticateToken, async (req, res) => {
+    try {
+        let getUsers = await bannerSchema.aggregate([
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                }
+            },
+            {
+                $sort: { priority: -1 }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: "banner not found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

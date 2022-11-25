@@ -33,6 +33,7 @@ const couponSchema = require('../models/couponSchema');
 const invoiceSchema = require('../models/invoiceSchema');
 const { getDateArray } = require('../utility/expiration');
 const apkLinkSchema = require('../models/apkLinkSchema');
+const bannerSchema = require('../models/bannerSchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -1900,6 +1901,63 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/addBanner', authenticateToken, checkUserRole(['superAdmin', 'admin']), uploadProfileImageToS3('banner').single('image'), async (req, res) => {
+    try {
+        const { priority } = req.body;
+        if (req.file == undefined || req.file.location == undefined) {
+            return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please pass image field` });
+        }
+
+        let addCategory = new bannerSchema({
+            banner: req.file != undefined ? req.file.location : "",
+            priority: priority
+        })
+        await addCategory.save();
+        addCategory._doc['id'] = addCategory._doc['_id'];
+        delete addCategory._doc.updatedAt;
+        delete addCategory._doc.createdAt;
+        delete addCategory._doc._id;
+        delete addCategory._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `banner successfully added` });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateBanner', authenticateToken, checkUserRole(['superAdmin', 'admin']), uploadProfileImageToS3('banner').single('image'), async (req, res) => {
+    try {
+        const { priority, bannerId } = req.body;
+
+        let checkCategory = await bannerSchema.findById(bannerId);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `banner not found` });
+        }
+
+        let addCategory = {
+            banner: req.file != undefined ? req.file.location : checkCategory.location,
+            priority: priority
+        }
+
+        if (req.file != undefined) {
+            let result = checkCategory.banner.indexOf("banner");
+            let key = checkCategory.banner.substring(result, checkCategory.icon.length)
+            if (key != undefined) {
+                removeObject(key)
+            }
+        }
+        let update = await bannerSchema.findByIdAndUpdate(bannerId, addCategory, { new: true });
+        if (update != undefined) {
+            update._doc['id'] = update._doc['_id'];
+            delete update._doc.updatedAt;
+            delete update._doc.createdAt;
+            delete update._doc._id;
+            delete update._doc.__v;
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `banner successfully updated` });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+
 router.post('/addTimerange', authenticateToken, checkUserRole(['superAdmin']),
     [body("start", "please provide start hours").notEmpty().isString().custom((value) => { return /^(\d{1,2})\:(\d{1,2})$/.test(value) }),
     body('end', "please provide ending hours").notEmpty().isString().custom((value) => { return /^(\d{1,2})\:(\d{1,2})$/.test(value) }),
