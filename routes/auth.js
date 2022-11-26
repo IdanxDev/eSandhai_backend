@@ -29,6 +29,10 @@ const orderItems = require('../models/orderItems');
 const { query } = require('express');
 const apkLinkSchema = require('../models/apkLinkSchema');
 const bannerSchema = require('../models/bannerSchema');
+const itemSchema = require('../models/itemSchema');
+const categorySchema = require('../models/categorySchema');
+const helperSchema = require('../models/helperSchema');
+const timeSchema = require('../models/timeSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -340,6 +344,304 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
     } catch (error) {
         console.log(error.message);
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getHelper', authenticateToken, async (req, res) => {
+    try {
+        let match;
+        let anotherMatch = [];
+        anotherMatch.push({ isVisible: true })
+        if ('title' in req.query) {
+            let regEx = new RegExp(req.query.title, 'i')
+            anotherMatch.push({ title: { $regex: regEx } })
+        }
+        if ('description' in req.query) {
+            let regEx = new RegExp(req.query.description, 'i')
+            anotherMatch.push({ description: { $regex: regEx } })
+        }
+        if ('categoryId' in req.query) {
+            anotherMatch.push({ categoryId: mongoose.Types.ObjectId(req.query.categoryId) })
+        }
+        console.log(anotherMatch);
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await helperSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+
+            {
+                $lookup: {
+                    from: "categories",
+                    localField: "categoryId",
+                    foreignField: "_id",
+                    as: "categoryData"
+                }
+            },
+            {
+                $addFields: {
+                    categoryName: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$categoryData" }, 0] }, then: { $first: "$categoryData.name" }, else: ""
+                        }
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    categoryData: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category helper found` : "no category helper found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getCategory', authenticateToken, async (req, res) => {
+    try {
+        let match;
+        let anotherMatch = [];
+        anotherMatch.push({ isVisible: true })
+
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('isSubscription' in req.query) {
+            anotherMatch.push({ isSubscription: req.query.isSubscription === 'true' })
+        }
+        if ('description' in req.query) {
+            let regEx = new RegExp(req.query.description, 'i')
+            anotherMatch.push({ description: { $regex: regEx } })
+        }
+        console.log(anotherMatch);
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await categorySchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
+            {
+                $lookup: {
+                    from: "helpers",
+                    let: { id: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$categoryId", "$$id"] }, { $eq: ["$isVisible", true] }] } } },
+                    {
+                        $addFields: {
+                            "id": "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            __v: 0,
+                            isVisible: 0
+                        }
+                    }],
+                    as: "helperData"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getItems', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        let match;
+        let anotherMatch = [];
+        anotherMatch.push({ isVisible: true })
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('unitType' in req.query) {
+            let regEx = new RegExp(req.query.unitType, 'i')
+            anotherMatch.push({ unitType: { $regex: regEx } })
+        }
+        if ('description' in req.query) {
+            let regEx = new RegExp(req.query.description, 'i')
+            anotherMatch.push({ description: { $regex: regEx } })
+        }
+        if ('categoryId' in req.query) {
+            anotherMatch.push({ categoryId: mongoose.Types.ObjectId(req.query.categoryId) })
+            let checkSubscription = await userSubscription.aggregate([{ $project: { pendingPickUp: { $sum: "$pickup" }, pendingDelivery: { $sum: "$delivery" } } }])
+        }
+        if ('isBag' in req.query) {
+            anotherMatch.push({ isBag: req.query.isBag === 'true' })
+        }
+        if ('priceTag' in req.query) {
+            let regEx = new RegExp(req.query.priceTag, 'i')
+            anotherMatch.push({ priceTag: { $regex: regEx } })
+        }
+        if ('itemId' in req.query) {
+            anotherMatch.push({ _id: mongoose.Types.ObjectId(req.query.itemId) })
+        }
+        if ('mrpStart' in req.query == true && 'mrpEnd' in req.query == true) {
+            anotherMatch.push({ $and: [{ mrp: { "$gte": parseFloat(req.query.mrpStart) } }, { mrp: { "$lte": parseFloat(req.query.mrpEnd) } }] });
+        }
+        if ('discountStart' in req.query == true && 'discountEnd' in req.query == true) {
+            anotherMatch.push({ $and: [{ discount: { "$gte": parseFloat(req.query.discountStart) } }, { discount: { "$lte": parseFloat(req.query.discountEnd) } }] });
+        }
+        if ('priceStart' in req.query == true && 'priceEnd' in req.query == true) {
+            anotherMatch.push({ $and: [{ price: { "$gte": parseFloat(req.query.priceStart) } }, { price: { "$lte": parseFloat(req.query.priceEnd) } }] });
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await itemSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $lookup: {
+                    from: "categories",
+                    localField: "categoryId",
+                    foreignField: "_id",
+                    as: "categoryData"
+                }
+            },
+            {
+                $addFields: {
+                    categoryName: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$categoryData" }, 0] }, then: { $first: "$categoryData.name" }, else: ""
+                        }
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    categoryData: 0
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category items found` : "no category items found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
 router.get('/getBanner', authenticateToken, async (req, res) => {
@@ -1490,6 +1792,113 @@ router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
         }
         let updateAddress = await addressSchema.findByIdAndUpdate(addressId, { isActive: false }, { new: true });
         return res.status(getAddress.length > 0 ? 200 : 400).json({ issuccess: getAddress.length > 0 ? true : false, data: { acknowledgement: getAddress.length > 0 ? true : false, data: getAddress }, message: getAddress.length > 0 ? "address removed successfully" : "address not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/addSession', authenticateToken, [oneOf([body('addressId', 'please pass valid address id').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+body('preferrdPickupTime', 'please pass valid pikcup time id').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+body('preferrdDeliveryTime', 'please pass valid delivery time id').isString().custom((value) => mongoose.Types.ObjectId.isValid(value))])], checkErr, async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const { addressId, preferrdPickupTime, preferrdDeliveryTime } = req.body;
+        console.log(addressId);
+        let resultArray = []
+        if (addressId != undefined) {
+            let checkAddress = await addressSchema.findByIdAndUpdate(addressId, { isDefault: true });
+            if (checkAddress != undefined && checkAddress != null) {
+                let update = await addressSchema.updateMany({ _id: { $ne: mongoose.Types.ObjectId(addressId) }, userId: mongoose.Types.ObjectId(userId) }, { isDefault: false })
+                checkAddress._doc['id'] = checkAddress._doc['_id'];
+                delete checkAddress._doc._id;
+                delete checkAddress._doc.__v;
+                resultArray.push({ addressUpdate: true });
+                // return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkAddress }, message: "address details updated" });
+            }
+            else {
+                resultArray.push({ addressUpdate: false });
+            }
+            // return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "address not found" });
+
+        }
+        console.log(resultArray);
+        if (preferrdDeliveryTime != undefined) {
+            let checkAddress = await timeSchema.findById(preferrdDeliveryTime);
+            if (checkAddress != undefined && checkAddress != null) {
+                let update = await userSchema.findByIdAndUpdate(userId, { preferrdDeliveryTime: preferrdDeliveryTime })
+                checkAddress._doc['id'] = checkAddress._doc['_id'];
+                delete checkAddress._doc._id;
+                delete checkAddress._doc.__v;
+                resultArray.push({ preferrdDeliveryTimeUpdate: true });
+
+                // return res.status(200).json({
+                //     issuccess: true, data: { acknowledgement: true, data: checkAddress }, message: "preferred delivery time updated"
+                // });
+            }
+            else {
+                resultArray.push({ preferrdDeliveryTimeUpdate: false });
+
+            }
+            // return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "this timeslot not found" });
+
+        }
+
+        console.log(resultArray);
+        if (preferrdPickupTime != undefined) {
+            let checkAddress = await timeSchema.findById(preferrdPickupTime);
+            if (checkAddress != undefined && checkAddress != null) {
+                let update = await userSchema.findByIdAndUpdate(userId, { preferrdPickupTime: preferrdPickupTime })
+                checkAddress._doc['id'] = checkAddress._doc['_id'];
+                delete checkAddress._doc._id;
+                delete checkAddress._doc.__v;
+                resultArray.push({ preferrdPickupTimeUpdate: true });
+
+                // return res.status(200).json({
+                //     issuccess: true, data: { acknowledgement: true, data: checkAddress }, message: "preferred pickup time updated"
+                // });
+            }
+            else {
+                3
+                resultArray.push({ preferrdPickupTimeUpdate: false });
+
+            }
+            // return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "this timeslot not found" });
+
+        }
+
+        console.log(resultArray);
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: resultArray }, message: "details updated" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getSession', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        let checkAddress = await addressSchema.aggregate([
+            {
+                $match: {
+                    isDefault: true
+                }
+            }
+        ]);
+        let getTimes = await userSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $project: {
+                    preferrdDeliveryTime: 1,
+                    preferrdPickupTime: 1
+                }
+            }
+        ]);
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { address: checkAddress.length > 0 ? checkAddress[0] : {}, time: getTimes != undefined && getTimes.length > 0 ? getTimes[0] : {} } }, message: "session details found" });
 
     } catch (error) {
         console.log(error.message);

@@ -51,6 +51,14 @@ const userSchema = mongoose.Schema({
     note: {
         type: String,
         default: ""
+    },
+    preferrdPickupTime: {
+        type: mongoose.Types.ObjectId,
+        ref: "pickups"
+    },
+    preferrdDeliveryTime: {
+        type: mongoose.Types.ObjectId,
+        ref: "pickups"
     }
 }, { timestamps: true });
 

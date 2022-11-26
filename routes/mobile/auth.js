@@ -526,6 +526,19 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
                 }
             },
             {
+                $lookup: {
+                    from: "usersubscriptions",
+                    let: { id: "$_id" },
+                    pipeline: [{
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $eq: ["$userId", "$$id"] },
+                                    {$eq:[""]}
+                    ]}}}]
+                }
+            },
+            {
                 $addFields: {
                     "id": "$_id"
                 }

@@ -1673,21 +1673,25 @@ router.get('/getRiders', authenticateToken, checkUserRole(['superAdmin', 'admin'
 
 router.post('/addApkLink', authenticateToken, checkUserRole(['superAdmin']), [body("apkLink", "please add apkLink").isString().notEmpty()], checkErr, async (req, res) => {
     try {
-        const { apkLink } = req.body;
+        const { apkLink, isAndroid } = req.body;
         let getApkLinks = await apkLinkSchema.aggregate([
             {
                 $match: {
-                    apkLink: apkLink
                 }
             }
         ]);
         if (getApkLinks.length > 0) {
-            let addApkLink = await apkLinkSchema.findByIdAndUpdate(getApkLinks[0]._id, { apkLink: apkLink }, { new: true });
-            console.log(addApkLink);
-            addApkLink._doc['id'] = addApkLink._doc['_id'];
-            delete addApkLink._doc.__v;
-            delete addApkLink._doc._id;
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addApkLink }, message: `link successfully updated` });
+            let update;
+            if (isAndroid) {
+                update = await apkLinkSchema.findByIdAndUpdate(getApkLinks[0], { apkLink: apkLink }, { new: true });
+            }
+            else {
+                update = await apkLinkSchema.findByIdAndUpdate(getApkLinks[1], { apkLink: apkLink }, { new: true });
+            }
+            update._doc['id'] = update._doc['_id'];
+            delete update._doc._id;
+            delete update._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: update }, message: `link successfully updated` });
         }
         let addApkLink = new apkLinkSchema({
             apkLink: apkLink
@@ -1718,6 +1722,8 @@ router.get('/getApkLink', authenticateToken, async (req, res) => {
                 }
             }
         ])
+        getUsers[0]['deviceType'] = 'Android'
+        getUsers[1]['deviceType'] = 'Ios'
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
