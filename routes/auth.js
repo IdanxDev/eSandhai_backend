@@ -1859,7 +1859,6 @@ body('preferrdDeliveryTime', 'please pass valid delivery time id').isString().cu
                 // });
             }
             else {
-                3
                 resultArray.push({ preferrdPickupTimeUpdate: false });
 
             }
@@ -1868,7 +1867,7 @@ body('preferrdDeliveryTime', 'please pass valid delivery time id').isString().cu
         }
 
         console.log(resultArray);
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: resultArray }, message: "details updated" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign({}, ...resultArray) }, message: "details updated" });
 
     } catch (error) {
         console.log(error.message);
