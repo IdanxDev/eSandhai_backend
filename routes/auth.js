@@ -684,7 +684,7 @@ router.get('/getBanner', authenticateToken, async (req, res) => {
                 $sort: { priority: -1 }
             }
         ])
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: "banner not found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? "banner details found" : "banner not found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
