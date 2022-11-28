@@ -17,8 +17,15 @@ const invoiceSchema = mongoose.Schema({
     },
     //0==initiated
     //1==pending
-    //2==processing
-    //3==completed
+    //2==booking confirm pickup pending
+    //3==pickup initiated
+    //4==pickup failed
+    //5==pickup complete
+    //6==processing
+    //7==complete and delivery pending
+    //8==out for delivery
+    //9==delivery failed
+    //10==delivery completed& order completed
     status: {
         type: Number,
         default: 0

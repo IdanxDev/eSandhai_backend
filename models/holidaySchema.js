@@ -6,6 +6,10 @@ const holidaySchema = mongoose.Schema({
     },
     timeSlots: [
         {
+            timerangeId: {
+                type: mongoose.Types.ObjectId,
+                ref: "timerange"
+            },
             time: {
                 type: String
             },
@@ -15,6 +19,10 @@ const holidaySchema = mongoose.Schema({
             }
         }
     ],
+    isHalfHoliday: {
+        type: Boolean,
+        default: false
+    },
     isFullHoliday: {
         type: Boolean,
         default: false

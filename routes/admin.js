@@ -31,9 +31,10 @@ const activeDays = require('../models/activeDays');
 const membershipDetails = require('../models/membershipDetails');
 const couponSchema = require('../models/couponSchema');
 const invoiceSchema = require('../models/invoiceSchema');
-const { getDateArray } = require('../utility/expiration');
+const { getDateArray, nextDays } = require('../utility/expiration');
 const apkLinkSchema = require('../models/apkLinkSchema');
 const bannerSchema = require('../models/bannerSchema');
+const dayWiseSchema = require('../models/dayWiseSchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -2383,10 +2384,11 @@ router.get('/getCoupons', authenticateToken, async (req, res) => {
 router.post('/addHoliday', authenticateToken, checkUserRole(['superAdmin']),
     [body("date", "please provide date").notEmpty().isString().custom((value) => { return regex.test(value) }),
     body('timeSlots', "please provide timeSlot Values").optional().isArray({ min: 1 }),
+    body('isHalfHoliday', 'please provide isHalfHoliday field value').optional().isBoolean(),
     body('isFullHoliday', 'please provide fullholiday field value').optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            let { date, timeSlots, isFullHoliday } = req.body;
+            let { date, timeSlots, isHalfHoliday, isFullHoliday } = req.body;
 
             if ('isFullHoliday' in req.body && isFullHoliday == true) {
                 let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: false, time: { $concat: ["$start", "-", "$end"] } } }]);
@@ -2397,11 +2399,14 @@ router.post('/addHoliday', authenticateToken, checkUserRole(['superAdmin']),
                     return res.status(400).json({ issuccess: false, data: { acknowledgement: false }, message: `please provide time slots` });
                 }
             }
-
+            let checkEntry = await dayWiseSchema.aggregate([{ $match: { date: date } }]);
+            if (checkEntry.length > 0) {
+                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `${date} cannot edit this date data` });
+            }
             let checkCategory = await holidaySchema.findOne({ date });
 
             if (checkCategory != undefined || checkCategory != null) {
-                let addCategory = await holidaySchema.findByIdAndUpdate(checkCategory._id, { date: date, timeSlots: timeSlots, isFullHoliday: isFullHoliday })
+                let addCategory = await holidaySchema.findByIdAndUpdate(checkCategory._id, { date: date, timeSlots: timeSlots, isHalfHoliday: isHalfHoliday, isFullHoliday: isFullHoliday })
                 addCategory._doc['id'] = addCategory._doc['_id'];
                 delete addCategory._doc.updatedAt;
                 delete addCategory._doc.createdAt;
@@ -2413,6 +2418,7 @@ router.post('/addHoliday', authenticateToken, checkUserRole(['superAdmin']),
             let addCategory = new holidaySchema({
                 date: date,
                 timeSlots: timeSlots,
+                isHalfHoliday: isHalfHoliday,
                 isFullHoliday: isFullHoliday
             })
 
@@ -2472,27 +2478,53 @@ router.get('/getActiveDays', authenticateToken, async (req, res) => {
 })
 router.get('/getPickUpDays', authenticateToken, async (req, res) => {
     try {
-        const { date } = req.query;
-        let getHoliday = await holidaySchema.findOne({ date: date });
-        console.log(getHoliday);
-        if (getHoliday != null && getHoliday != undefined) {
-            let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
-            console.log(checkExist);
-            if (checkExist.length > 0) {
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+        // console.log(moment()
+        //     .tz('America/Panama')
+        //     .format("DD/MM/YYYY"));
+        // console.log(moment()
+        //     .tz('America/Panama')
+        //     .format("H:mm:ss"));
+
+        let currentDate = moment()
+            .tz('America/Panama')
+        // console.log(currentDate);
+        let getNextDays = await nextDays(currentDate)
+        // console.log(getNextDays);
+        let getDays = await dayWiseSchema.aggregate([
+            {
+                $match: {
+                    date: { $in: getNextDays }
+                }
+            },
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0
+                }
+            },
+            {
+                $group: {
+                    _id: { date: "$date" },
+                    timeSlots: { $push: "$$ROOT" }
+                }
+            },
+            {
+                $addFields: {
+                    date: "$_id.date"
+                }
+            },
+            {
+                $project: {
+                    _id: 0
+                }
             }
-            let addDay = new activeDays({ date: getHoliday.date, timeSlots: getHoliday.timeSlots, isFullHoliday: getHoliday.isFullHoliday });
-            await addDay.save();
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} status found` });
-        }
-        let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
-        if (checkExist.length > 0) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
-        }
-        let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: true, time: { $concat: ["$start", " - ", "$end"] } } }]);
-        let addDay = new activeDays({ date: date, timeSlots: getTimeRange });
-        await addDay.save();
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} holiday successfully added` });
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getDays }, message: `data found for next 7 days` });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
