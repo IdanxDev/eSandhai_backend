@@ -59,6 +59,25 @@ const userSchema = mongoose.Schema({
     preferrdDeliveryTime: {
         type: mongoose.Types.ObjectId,
         ref: "pickups"
+    },
+    pickupAddressId: {
+        type: mongoose.Types.ObjectId,
+        ref: "address"
+    }, deliveryAddressId: {
+        type: mongoose.Types.ObjectId,
+        ref: "address"
+    }, preferrdPickupId: {
+        type: mongoose.Types.ObjectId,
+        ref: "daywise"
+    }, preferrdDeliveryId: {
+        type: mongoose.Types.ObjectId,
+        ref: "daywise"
+    }, pickupInstruction: {
+        type: String,
+        default: ""
+    }, deliveryInstruction: {
+        type: String,
+        ref: ""
     }
 }, { timestamps: true });
 

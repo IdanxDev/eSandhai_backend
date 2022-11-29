@@ -1799,76 +1799,24 @@ router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addSession', authenticateToken, [oneOf([body('addressId', 'please pass valid address id').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+router.post('/addSession', authenticateToken, [oneOf([body('pickupAddressId', 'please pass valid pickupAddressId').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+body('deliveryAddressId', 'please pass valid deliveryAddressId').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+body('preferrdPickupId', 'please pass valid preferrdPickupId').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+body('preferrdDeliveryId', 'please pass valid preferrdDeliveryId').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
 body('preferrdPickupTime', 'please pass valid pikcup time id').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
-body('preferrdDeliveryTime', 'please pass valid delivery time id').isString().custom((value) => mongoose.Types.ObjectId.isValid(value))])], checkErr, async (req, res, next) => {
+body('preferrdDeliveryTime', 'please pass valid delivery time id').isString().custom((value) => mongoose.Types.ObjectId.isValid(value)),
+body('pickupInstruction', 'please pass valid pickup instruction details').isString().notEmpty(),
+body('deliveryInstruction', 'please pass valid delivery instruction details').isString().notEmpty()])], checkErr, async (req, res, next) => {
     try {
         const userId = req.user._id;
-        const { addressId, preferrdPickupTime, preferrdDeliveryTime } = req.body;
-        console.log(addressId);
-        let resultArray = []
-        if (addressId != undefined) {
-            let checkAddress = await addressSchema.findByIdAndUpdate(addressId, { isDefault: true });
-            if (checkAddress != undefined && checkAddress != null) {
-                let update = await addressSchema.updateMany({ _id: { $ne: mongoose.Types.ObjectId(addressId) }, userId: mongoose.Types.ObjectId(userId) }, { isDefault: false })
-                checkAddress._doc['id'] = checkAddress._doc['_id'];
-                delete checkAddress._doc._id;
-                delete checkAddress._doc.__v;
-                resultArray.push({ addressUpdate: true });
-                // return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkAddress }, message: "address details updated" });
-            }
-            else {
-                resultArray.push({ addressUpdate: false });
-            }
-            // return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "address not found" });
-
+        const { pickupAddressId, deliveryAddressId, preferrdPickupId, preferrdDeliveryId, preferrdPickupTime, preferrdDeliveryTime, pickupInstruction, deliveryInstruction } = req.body;
+        let addDetails = await userSchema.findByIdAndUpdate(userId, { pickupAddressId: pickupAddressId, deliveryAddressId: deliveryAddressId, preferrdPickupId: preferrdPickupId, preferrdDeliveryId: preferrdDeliveryId, preferrdPickupTime: preferrdPickupTime, preferrdDeliveryTime: preferrdDeliveryTime, pickupInstruction: pickupInstruction, deliveryInstruction: deliveryInstruction }, { new: true })
+        if (addDetails != undefined && addDetails != null) {
+            addDetails._doc['id'] = addDetails._doc['_id'];
+            delete addDetails._id;
+            delete addDetails.__v;
         }
-        console.log(resultArray);
-        if (preferrdDeliveryTime != undefined) {
-            let checkAddress = await timeSchema.findById(preferrdDeliveryTime);
-            if (checkAddress != undefined && checkAddress != null) {
-                let update = await userSchema.findByIdAndUpdate(userId, { preferrdDeliveryTime: preferrdDeliveryTime })
-                checkAddress._doc['id'] = checkAddress._doc['_id'];
-                delete checkAddress._doc._id;
-                delete checkAddress._doc.__v;
-                resultArray.push({ preferrdDeliveryTimeUpdate: true });
-
-                // return res.status(200).json({
-                //     issuccess: true, data: { acknowledgement: true, data: checkAddress }, message: "preferred delivery time updated"
-                // });
-            }
-            else {
-                resultArray.push({ preferrdDeliveryTimeUpdate: false });
-
-            }
-            // return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "this timeslot not found" });
-
-        }
-
-        console.log(resultArray);
-        if (preferrdPickupTime != undefined) {
-            let checkAddress = await timeSchema.findById(preferrdPickupTime);
-            if (checkAddress != undefined && checkAddress != null) {
-                let update = await userSchema.findByIdAndUpdate(userId, { preferrdPickupTime: preferrdPickupTime })
-                checkAddress._doc['id'] = checkAddress._doc['_id'];
-                delete checkAddress._doc._id;
-                delete checkAddress._doc.__v;
-                resultArray.push({ preferrdPickupTimeUpdate: true });
-
-                // return res.status(200).json({
-                //     issuccess: true, data: { acknowledgement: true, data: checkAddress }, message: "preferred pickup time updated"
-                // });
-            }
-            else {
-                resultArray.push({ preferrdPickupTimeUpdate: false });
-
-            }
-            // return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "this timeslot not found" });
-
-        }
-
-        console.log(resultArray);
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign({}, ...resultArray) }, message: "details updated" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDetails }, message: "details updated" });
 
     } catch (error) {
         console.log(error.message);
@@ -1878,13 +1826,7 @@ body('preferrdDeliveryTime', 'please pass valid delivery time id').isString().cu
 router.get('/getSession', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id;
-        let checkAddress = await addressSchema.aggregate([
-            {
-                $match: {
-                    isDefault: true
-                }
-            }
-        ]);
+
         let getTimes = await userSchema.aggregate([
             {
                 $match: {
@@ -1892,13 +1834,56 @@ router.get('/getSession', authenticateToken, async (req, res, next) => {
                 }
             },
             {
+                $lookup: {
+                    from: "addresses",
+                    let: { id: "$pickupAddressId" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$id"] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            __v: 0,
+                            _id: 0
+                        }
+                    }],
+                    as: "pickupAddress"
+                }
+            },
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: { id: "$deliveryAddressId" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$id"] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            __v: 0,
+                            _id: 0
+                        }
+                    }],
+                    as: "deliveryAddress"
+                }
+            }, {
                 $project: {
                     preferrdDeliveryTime: 1,
-                    preferrdPickupTime: 1
+                    preferrdPickupTime: 1,
+                    deliveryAddressId: 1,
+                    deliveryInstruction: 1,
+                    pickupAddressId: 1,
+                    pickupInstruction: 1,
+                    preferrdDeliveryId: 1,
+                    preferrdPickupId: 1,
+                    deliveryAddress: { $first: "$deliveryAddress" },
+                    pickupAddress: { $first: "$pickupAddress" }
                 }
             }
         ]);
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { address: checkAddress.length > 0 ? checkAddress[0] : {}, time: getTimes != undefined && getTimes.length > 0 ? getTimes[0] : {} } }, message: "session details found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getTimes }, message: "session details found" });
 
     } catch (error) {
         console.log(error.message);

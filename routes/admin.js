@@ -3761,6 +3761,36 @@ router.post('/addProof', authenticateToken, checkUserRole(['superAdmin']), uploa
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
+router.put('/updateSubscription', authenticateToken, [check('subscriptionId', 'please pass valid subscription id').isString().custom(value => { return mongoose.Types.ObjectId.isValid(value) }),
+check('status', 'please pass valid status').isNumeric().isIn([2, 4]),
+check('paymentId', 'please pass valid payment id').optional().isString(),
+check('note', 'please pass valid notes').optional().isString()], checkErr, async (req, res, next) => {
+    try {
+        const { subscriptionId, status, paymentId, note } = req.body;
+        const userId = req.user._id;
+        let checkCategory = await userSubscription.findById(mongoose.Types.ObjectId(subscriptionId));
+        // console.log(checkCategory);
+        if (checkCategory == undefined || checkCategory == null) {
+            return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
+        }
+        let updateField = {
+            status: status,
+            paymentId: paymentId,
+            note: note
+        }
+        let createAddress = await userSubscription.findByIdAndUpdate(subscriptionId, updateField, { new: true });
+        createAddress._doc['id'] = createAddress._doc['_id'];
+        delete createAddress._doc.updatedAt;
+        delete createAddress._doc.createdAt;
+        delete createAddress._doc._id;
+        delete createAddress._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user subscription updated" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.put('/updateProof', authenticateToken, checkUserRole(['superAdmin']),
     [
         body('description').optional().notEmpty().isString().withMessage("please pass string value for description"),
