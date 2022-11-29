@@ -1,15 +1,9 @@
 const mongoose = require('mongoose');
 // const bcrypt = require('bcrypt');
 const invoiceSchema = mongoose.Schema({
-    delivery: String,
-    pickup: String,
-    deliveryTimeId: {
+    dayWiseId: {
         type: mongoose.Types.ObjectId,
-        ref: "time"
-    },
-    pickupTimeId: {
-        type: mongoose.Types.ObjectId,
-        ref: "time"
+        ref: "daywises"
     },
     userId: {
         type: mongoose.Types.ObjectId,

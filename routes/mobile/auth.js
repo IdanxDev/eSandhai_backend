@@ -21,6 +21,7 @@ const subscriptionSchema = require('../../models/subscriptionSchema');
 const bodySchema = require('../../models/bodySchema');
 const { checkUserSubscriptionMember } = require('../../utility/expiration');
 const invoiceSchema = require('../../models/invoiceSchema');
+const contactUsSchema = require('../../models/contactUsSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -70,6 +71,40 @@ router.post('/signUp', [body('email').isEmail().withMessage("please pass email i
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/contactUs',
+    [body('email', 'please pass valid email').isString().notEmpty().isEmail(),
+    body('subject', 'please pass valid subject details').optional().isString().notEmpty(),
+    body('message', 'please pass valid message').optional().isString().notEmpty()], checkErr, async (req, res) => {
+        try {
+            const { email, subject, message } = req.body;
+
+            let checkExist = await contactUsSchema.aggregate([{ $match: { email: email } }, { $addFields: { id: "$_id" } }, {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }]);
+            if (checkExist.length > 0) {
+                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: checkExist }, message: `request already registered we will contact you soon` });
+            }
+
+            let addCategory = new contactUsSchema({
+                email: email,
+                subject: subject,
+                message: message
+            })
+            await addCategory.save()
+
+            addCategory._doc['id'] = addCategory._doc['_id'];
+            delete addCategory._doc.updatedAt;
+            delete addCategory._doc.createdAt;
+            delete addCategory._doc._id;
+            delete addCategory._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `contact us details added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
 router.post('/signUpWithGoogle', async (req, res, next) => {
     try {
         // console.log(req.body)
@@ -390,6 +425,10 @@ router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => 
         // console.log(checkCategory);
         if (checkCategory == undefined || checkCategory == null) {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership details not found` });
+        }
+        let checkMembership = await membershipSchema.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }] } }])
+        if (checkMembership.length > 0) {
+            return res.status(403).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership already purchased` });
         }
         let orderId = makeid(12);
         let pendingDays = duration == 0 ? 28 : (duration == 1 ? (28 * 6) : 365);
@@ -1072,14 +1111,19 @@ router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
 })
 router.post('/addSubscription', authenticateToken, async (req, res, next) => {
     try {
-        const { planId,
-            duration } = req.body;
+        const { planId, duration } = req.body;
         const userId = req.user._id;
         let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
         // console.log(checkCategory);
         if (checkCategory == undefined || checkCategory == null) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
         }
+
+        let checkActiveSubscription = await userSubscription.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }] } }])
+        if (checkActiveSubscription != undefined && checkActiveSubscription != null) {
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `subscription already running` });
+        }
+
         let orderId = makeid(12);
         let pendingDays = duration == 0 ? 28 : (duration == 1 ? (28 * 6) : 365);
         let createAddress = new userSubscription({
@@ -1111,7 +1155,9 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.put('/updateSubscription', authenticateToken, async (req, res, next) => {
+router.put('/updateSubscription', authenticateToken, [check('subscriptionId', 'please pass valid subscription id').custom((value => mongoose.Types.ObjectId.isValid(value))),
+check('status', 'please pass valid status field').isNumeric().isIn([0, 1, 3]),
+check('paymentId', 'please pass payment id').custom().isString().notEmpty(), check('status', 'please pass status').custom().isString().notEmpty()], checkErr, async (req, res, next) => {
     try {
         const { subscriptionId, status, paymentId, note } = req.body;
         const userId = req.user._id;

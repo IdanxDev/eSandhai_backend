@@ -35,6 +35,7 @@ const { getDateArray, nextDays } = require('../utility/expiration');
 const apkLinkSchema = require('../models/apkLinkSchema');
 const bannerSchema = require('../models/bannerSchema');
 const dayWiseSchema = require('../models/dayWiseSchema');
+const taxSchema = require('../models/taxSchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -1908,6 +1909,30 @@ router.get('/getCategory', authenticateToken, async (req, res) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.post('/addTaxes', authenticateToken, checkUserRole(['superAdmin', 'admin']),
+    [body('isSubscription', 'please pass valid subscription status').isBoolean(),
+    body('isMember', 'please pass valid membership status').isBoolean(),
+    body('taxes', 'please pass taxes details').isObject()], checkErr, async (req, res) => {
+        try {
+            const { isSubscription, isMember, taxes } = req.body;
+
+            let addCategory = new taxSchema({
+                isSubscription: isSubscription,
+                isMember: isMember,
+                taxes: taxes
+            })
+            await addCategory.save()
+
+            addCategory._doc['id'] = addCategory._doc['_id'];
+            delete addCategory._doc.updatedAt;
+            delete addCategory._doc.createdAt;
+            delete addCategory._doc._id;
+            delete addCategory._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addCategory }, message: `taxes details saved for membership ${isMember} status and subscription status ${isSubscription}` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
 router.post('/addBanner', authenticateToken, checkUserRole(['superAdmin', 'admin']), uploadProfileImageToS3('banner').single('image'), async (req, res) => {
     try {
         const { priority } = req.body;

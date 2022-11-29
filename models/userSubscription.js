@@ -55,6 +55,7 @@ const userSubscription = mongoose.Schema({
     //1==paid/active
     //2==expired
     //3==payment failed
+    //4==used
     status: {
         type: Number,
         default: 0
