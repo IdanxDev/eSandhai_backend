@@ -226,7 +226,9 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
             {
                 $addFields: {
                     "id": "$_id",
-                    "mobileNo": ""
+                    "mobileNo": {
+                        $concat: ["$countryCode" + "-" + "$mobileNo"]
+                    }
                 }
             },
             {
