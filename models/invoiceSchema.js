@@ -36,13 +36,24 @@ const invoiceSchema = mongoose.Schema({
         type: Number,
         default: 0
     },
+    taxes: {
+        type: Map
+    },
+    finalAmount: {
+        type: Number,
+        default: 0
+    },
     orderId: {
         type: String,
         default: ""
     },
     paymentId: [String],
     note: String,
-    addressId: {
+    pickupId: {
+        type: mongoose.Types.ObjectId,
+        ref: "address"
+    },
+    deliveryId: {
         type: mongoose.Types.ObjectId,
         ref: "address"
     }

@@ -31,7 +31,7 @@ const activeDays = require('../models/activeDays');
 const membershipDetails = require('../models/membershipDetails');
 const couponSchema = require('../models/couponSchema');
 const invoiceSchema = require('../models/invoiceSchema');
-const { getDateArray, nextDays } = require('../utility/expiration');
+const { getDateArray, nextDays, checkUserSubscriptionMember } = require('../utility/expiration');
 const apkLinkSchema = require('../models/apkLinkSchema');
 const bannerSchema = require('../models/bannerSchema');
 const dayWiseSchema = require('../models/dayWiseSchema');
@@ -2509,12 +2509,22 @@ router.get('/getPickUpDays', authenticateToken, async (req, res) => {
         // console.log(moment()
         //     .tz('America/Panama')
         //     .format("H:mm:ss"));
-
+        const userId = req.user._id;
         let currentDate = moment()
             .tz('America/Panama')
+        let checkSubscription = await checkUserSubscriptionMember(userId)
+        // console.log("subscription");
+        // console.log(checkSubscription);
+        if (checkSubscription.length > 0 && 'isSubscription' in checkSubscription[0] && 'isMember' in checkSubscription[0] && checkSubscription[0].isSubscription == true && checkSubscription[0].isMember == true) {
+
+        }
+        else {
+            console.log("else");
+            currentDate = currentDate.add(1, 'day');
+        }
         // console.log(currentDate);
         let getNextDays = await nextDays(currentDate)
-        // console.log(getNextDays);
+        console.log(getNextDays);
         let getDays = await dayWiseSchema.aggregate([
             {
                 $match: {
@@ -2540,12 +2550,25 @@ router.get('/getPickUpDays', authenticateToken, async (req, res) => {
             },
             {
                 $addFields: {
-                    date: "$_id.date"
+                    date: "$_id.date",
+                    dateType: {
+                        $dateFromString: {
+                            dateString: "$_id.date",
+                            format: "%d/%m/%Y",
+                            timezone: "-04:00"
+                        }
+                    }
+                }
+            },
+            {
+                $sort: {
+                    dateType: 1
                 }
             },
             {
                 $project: {
-                    _id: 0
+                    _id: 0,
+                    dateType: 0
                 }
             }
         ])
@@ -2570,7 +2593,6 @@ router.get('/getHoliday', authenticateToken, async (req, res) => {
         else {
             match = {
                 $match: {
-
                 }
             }
         }

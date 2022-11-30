@@ -2205,14 +2205,17 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
 
 router.post('/addOrder', authenticateToken, async (req, res, next) => {
     try {
-        const { delivery, pickup, deliveryTimeId, pickupTimeId, status, addressId, items } = req.body;
+        const { dayWiseId, status, pickupId, deliveryId, items } = req.body;
         const userId = req.user._id;
         let checkSubscription = await checkUserSubscriptionMember(userId);
         let totalAmount = 0;
         let itemsDoc = []
         let orderId = makeid(12);
         if (items != undefined && items != null) {
+            let itemIds = items.map(e => mongoose.Types.ObjectId(e.itemId));
+            let getItems = await itemSchema.aggregate([{ $match: { _id: { $in: itemIds } } }])
             for (i = 0; i < items.length; i++) {
+                let amount = getItems.findIndex((item, index) => { if (item._id == items[i].itemId) { return item } return {} })
                 totalAmount += (items[i].amount * items[i].qty);
                 console.log(totalAmount);
             }
