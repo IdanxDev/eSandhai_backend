@@ -564,6 +564,23 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                                 itemData: { $first: "$itemData" }
                             }
                         },
+                        {
+                            $group: {
+                                _id: "$categoryName",
+                                items: { $push: "$$ROOT" }
+                            }
+                        },
+                        {
+                            $addFields: {
+                                name: "$_id.name",
+                                categoryData: "$_id"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0
+                            }
+                        }
                     ],
                     as: "ordermItems"
                 }
@@ -645,6 +662,11 @@ router.get('/getPickUpDays', authenticateToken, async (req, res) => {
                 }
             },
             {
+                $match: {
+                    isActive: true
+                }
+            },
+            {
                 $addFields: {
                     id: "$_id"
                 }
@@ -669,6 +691,36 @@ router.get('/getPickUpDays', authenticateToken, async (req, res) => {
                             dateString: "$_id.date",
                             format: "%d/%m/%Y",
                             timezone: "-04:00"
+                        }
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    dayNo: { $dayOfWeek: "$dateType" },
+                    monthNo: { $month: "$dateType" }
+                }
+            },
+            {
+                $addFields: {
+                    month: {
+                        $let: {
+                            vars: {
+                                monthsInString: [, 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                            },
+                            in: {
+                                $arrayElemAt: ['$$monthsInString', '$monthNo']
+                            }
+                        }
+                    },
+                    day: {
+                        $let: {
+                            vars: {
+                                dayInString: [, 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                            },
+                            in: {
+                                $arrayElemAt: ['$$dayInString', '$dayNo']
+                            }
                         }
                     }
                 }
