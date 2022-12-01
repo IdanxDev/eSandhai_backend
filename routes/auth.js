@@ -20,6 +20,7 @@ const { generateAccessToken, authenticateToken, generateRefreshToken, checkUserR
 const addressSchema = require('../models/addressSchema');
 const { checkErr } = require('../utility/error');
 const userSubscription = require('../models/userSubscription');
+const taxSchema = require('../models/taxSchema')
 const subscriptionSchema = require('../models/subscriptionSchema');
 const bodySchema = require('../models/bodySchema');
 const membershipDetails = require('../models/membershipDetails');
@@ -1087,6 +1088,176 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
                     addressData: { $first: "$addressData" },
                     deliveryTime: { $concat: [{ $first: "$deliveryTime.start" }, "-", { $first: "$deliveryTime.end" }] },
                     pickupTime: { $concat: [{ $first: "$pickupTime.start" }, "-", { $first: "$pickupTime.end" }] }
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    userData: 0,
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `invoice order found` : "no any invoice orders found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getUserOrders', authenticateToken, async (req, res) => {
+    try {
+        const { orderId } = req.query;
+        const userId = req.user._id;
+        let match;
+        let anotherMatch = [];
+        // if ('name' in req.query) {
+        //     let regEx = new RegExp(req.query.name, 'i')
+        //     anotherMatch.push({ name: { $regex: regEx } })
+        // }
+        anotherMatch.push({ userId: mongoose.Types.ObjectId(userId) })
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if (orderId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(orderId)
+            })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await invoiceSchema.aggregate([
+            { $match: { userId: mongoose.Types.ObjectId(userId) } },
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $sort: { createdAt: -1 }
+            },
+            {
+                $lookup: {
+                    from: "daywise",
+                    let: { deliveryId: "$deliveryTimeId", pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$deliveryId"] } } }],
+                    as: "deliveryTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "daywise",
+                    let: { pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$pickupId"] } } }],
+                    as: "pickupTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    let: { userId: "$userId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }],
+                    as: "userData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: { addressId: "$addressId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "addressData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "orderitems",
+                    let: { id: "$_id" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$orderId", "$$id"] } } },
+                        {
+                            $lookup:
+                            {
+                                from: "categories",
+                                let: { categoryId: "$categoryId" },
+                                pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$categoryId"] } } }, { $addFields: { id: "$_id" } }, { $project: { _id: 0, __v: 0 } }],
+                                as: "categoryData"
+                            }
+                        },
+                        {
+                            $addFields: {
+                                categoryName: { $first: "$categoryData" },
+                                id: "$_id"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0, __v: 0
+                            }
+                        },
+                        {
+                            $lookup:
+                            {
+                                from: "items",
+                                let: { id: "$itemId" },
+                                pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$id"] } } }, { $addFields: { id: "$_id" } }, { $project: { _id: 0, __v: 0 } }],
+                                as: "itemData"
+                            }
+                        }, {
+                            $addFields: {
+                                itemData: { $first: "$itemData" }
+                            }
+                        },
+                    ],
+                    as: "ordermItems"
+                }
+            },
+            {
+                $addFields: {
+                    invoiceId: "$orderId",
+                    paymentStatus: { $cond: { if: { $and: [{ $isArray: "$paymentId" }, { $gte: [{ $size: "$paymentId" }, 1] }] }, then: 1, else: 0 } },
+                    invoiceStatus: "$status",
+                    amount: "$orderAmount",
+                    name: { $first: "$userData.name" },
+                    addressData: { $first: "$addressData" },
+                    deliveryTime: { $first: "$deliveryTime.timeSlot" },
+                    pickupTime: { $first: "$pickupTime.timeSlot" }
                 }
             },
             {
@@ -2205,41 +2376,70 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
 
 router.post('/addOrder', authenticateToken, async (req, res, next) => {
     try {
-        const { dayWiseId, status, pickupId, deliveryId, items } = req.body;
+        const { pickupTimeId, deliveryTimeId, pickupInstruction, deliveryInstruction, pickupAddressId, deliveryAddressId, items } = req.body;
         const userId = req.user._id;
         let checkSubscription = await checkUserSubscriptionMember(userId);
         let totalAmount = 0;
+        let payableAmount = 0;
         let itemsDoc = []
+        let allItems = []
         let orderId = makeid(12);
+        let taxApplied = {}
         if (items != undefined && items != null) {
             let itemIds = items.map(e => mongoose.Types.ObjectId(e.itemId));
             let getItems = await itemSchema.aggregate([{ $match: { _id: { $in: itemIds } } }])
+            console.log("items");
             for (i = 0; i < items.length; i++) {
-                let amount = getItems.findIndex((item, index) => { if (item._id == items[i].itemId) { return item } return {} })
-                totalAmount += (items[i].amount * items[i].qty);
-                console.log(totalAmount);
+                console.log();
+                let amount = getItems.find((item) => { if (item._id.toString() == items[i].itemId.toString()) { return item.price } return {} })
+                console.log(amount.price);
+                if (amount != undefined) {
+                    totalAmount += (amount.price * items[i].qty);
+                    allItems.push(Object.assign(items[i], { amount: (amount.price * items[i].qty) }))
+                }
             }
         }
         console.log(totalAmount);
+        //check for 15$ validation
+        if (checkSubscription != undefined && 'isSubscription' in checkSubscription && 'isMember' in checkSubscription && checkSubscription.isSubscription == false && checkSubscription.isMember == false && totalAmount < 15) {
+            return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
+        }
+
+        let taxes = await taxSchema.findOne({ isSubscription: checkSubscription[0].isSubscription, isMember: checkSubscription[0].isMember })
+        console.log(taxes);
+        if (taxes != undefined && taxes != null) {
+            taxApplied = taxes.taxes;
+            console.log(Object.values(taxApplied));
+            payableAmount = parseFloat(totalAmount) + parseFloat((Object.values(taxApplied)).reduce((a, b) => a + b, 0))
+        }
+        else {
+            payableAmount = parseFloat(totalAmount);
+        }
+        console.log(taxApplied);
+        console.log(totalAmount + "  " + payableAmount);
         let addOrder = new invoiceSchema({
-            delivery: delivery,
-            pickup: pickup,
-            status: status,
-            userId: userId,
-            orderId: orderId,
-            deliveryTimeId: deliveryTimeId,
             pickupTimeId: pickupTimeId,
-            addressId: addressId,
+            deliveryTimeId: deliveryTimeId,
+            status: 0,
+            userId: userId,
+            deliveryInstruction: deliveryInstruction,
+            pickupInstruction: pickupInstruction,
+            orderId: orderId,
+            taxes: taxApplied,
+            pickupAddressId: pickupAddressId,
+            deliveryAddressId: deliveryAddressId,
             isSubscribed: checkSubscription.isSubscribed,
             isMember: checkSubscription.isMember,
             orderAmount: totalAmount,
+            finalAmount: payableAmount,
+            pendingAmount: payableAmount,
             userId: userId
         })
         await addOrder.save();
         if (items != undefined && items != null) {
-            console.log(addOrder);
-            for (i = 0; i < items.length; i++) {
-                itemsDoc.push({ itemId: items[i].itemId, qty: items[i].qty, amount: (items[i].amount * items[i].qty), categoryId: items[i].categoryId, orderId: addOrder._id })
+            // console.log(addOrder);
+            for (i = 0; i < allItems.length; i++) {
+                itemsDoc.push({ itemId: allItems[i].itemId, qty: allItems[i].qty, amount: allItems[i].amount, categoryId: allItems[i].categoryId, orderId: addOrder._id })
             }
         }
         if (itemsDoc.length > 0) {
@@ -2258,14 +2458,62 @@ router.post('/addOrder', authenticateToken, async (req, res, next) => {
 })
 router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
     try {
-        const { qty, amount, itemId, categoryId, orderId } = req.body;
+        const { qty, itemId, categoryId, orderId } = req.body;
         const userId = req.user._id;
+        let taxApplied = {}
+        let getOrder = await invoiceSchema.findById(orderId);
+        if (getOrder == undefined || getOrder == null) {
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order details not found' });
+        }
+        let checkSubscription = await checkUserSubscriptionMember(userId);
+        let taxes = await taxSchema.findOne({ isSubscription: true, isMember: checkSubscription[0].isMember })
+        // console.log(taxes);
+        if (taxes != undefined && taxes != null) {
+            taxApplied = taxes.taxes;
+            payableAmount = parseFloat(getOrder.orderAmount) + parseFloat((Object.values(taxApplied)).reduce((a, b) => a + b, 0))
+            if (JSON.stringify(getOrder.taxes) != JSON.stringify(taxApplied)) {
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+            }
+        }
+        else {
+            if (JSON.stringify(getOrder.taxes) != JSON.stringify({})) {
+                taxApplied = {};
+                payableAmount = parseFloat(getOrder.orderAmount) + parseFloat(0)
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+            }
+        }
+        let getItem = await itemSchema.findById(itemId);
+        if (getItem == undefined || getItem == null) {
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'item not found' });
+        }
+        const amount = getItem.price;
+        let finalAmount = qty * amount;
         let checkItems = await orderItems.findOne({ itemId: mongoose.Types.ObjectId(itemId), orderId: mongoose.Types.ObjectId(orderId) });
         if (checkItems != null && checkItems != undefined) {
-            let finalAmount = (qty * amount);
-            console.log(qty + "  " + amount);
-            let updateQty = await orderItems.findByIdAndUpdate(checkItems._id, { $inc: { qty: qty, amount: finalAmount } }, { new: true })
-            let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount } }, { new: true });
+            let updateQty;
+            console.log("qty");
+            console.log(checkItems.qty);
+            let finalQty = checkItems.qty + qty;
+            console.log(finalQty);
+            if (finalQty <= 0) {
+                updateQty = await orderItems.findByIdAndRemove(checkItems._id)
+                updateQty._doc['qty'] = 0
+                updateQty._doc['amount'] = 0
+            }
+            else {
+                updateQty = await orderItems.findByIdAndUpdate(checkItems._id, {
+                    $inc: {
+                        qty: qty, amount: finalAmount
+                    }
+                }, { new: true })
+            }
+            console.log(finalAmount);
+            let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, {
+                $inc: {
+                    orderAmount: finalAmount, finalAmount: finalAmount,
+                    pendingAmount: finalAmount
+                }
+            }, { new: true });
             updateQty._doc['id'] = updateQty._doc['_id'];
             delete updateQty._doc.updatedAt;
             delete updateQty._doc.createdAt;
@@ -2281,7 +2529,6 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             orderId: orderId
         })
         await addItem.save();
-        let finalAmount = qty * amount;
         let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount } }, { new: true });
         addItem._doc['id'] = addItem._doc['_id'];
         delete addItem._doc.updatedAt;

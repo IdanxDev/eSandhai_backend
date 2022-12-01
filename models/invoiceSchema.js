@@ -5,9 +5,32 @@ const invoiceSchema = mongoose.Schema({
         type: mongoose.Types.ObjectId,
         ref: "daywises"
     },
+    pickupTimeId: {
+        type: mongoose.Types.ObjectId,
+        ref: "daywises"
+    }, deliveryTimeId: {
+        type: mongoose.Types.ObjectId,
+        ref: "daywises"
+    },
     userId: {
         type: mongoose.Types.ObjectId,
         ref: "users"
+    },
+    pickupInstruction: {
+        type: String,
+        default: ""
+    },
+    deliveryInstruction: {
+        type: String,
+        default: ""
+    },
+    pickupId: {
+        type: mongoose.Types.ObjectId,
+        ref: "addresses"
+    },
+    deliveryId: {
+        type: mongoose.Types.ObjectId,
+        ref: "addresses"
     },
     //0==initiated
     //1==pending
@@ -37,9 +60,22 @@ const invoiceSchema = mongoose.Schema({
         default: 0
     },
     taxes: {
-        type: Map
+        type: Map,
+        of: Number
     },
     finalAmount: {
+        type: Number,
+        default: 0
+    },
+    amountPaid: {
+        type: Number,
+        default: 0
+    },
+    pendingAmount: {
+        type: Number,
+        default: 0
+    },
+    refundAmount: {
         type: Number,
         default: 0
     },
@@ -49,14 +85,15 @@ const invoiceSchema = mongoose.Schema({
     },
     paymentId: [String],
     note: String,
-    pickupId: {
+    pickupAddressId: {
         type: mongoose.Types.ObjectId,
         ref: "address"
     },
-    deliveryId: {
+    deliveryAddressId: {
         type: mongoose.Types.ObjectId,
         ref: "address"
-    }
+    },
+
 }, { timestamps: true });
 
 module.exports = mongoose.model("invoice", invoiceSchema);

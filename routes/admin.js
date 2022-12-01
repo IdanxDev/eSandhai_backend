@@ -3297,6 +3297,62 @@ router.post('/addMembershipDetail', authenticateToken, checkUserRole(['superAdmi
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
+router.post('/registerUser', authenticateToken, checkUserRole(['superAdmin', 'admin']),
+    [body('name').isString().withMessage("please pass user name"),
+    body('email', 'please pass valid email').isString().isEmail(),
+    body('dob', 'please pass valid dob').isString().custom((value) => { return regex.test(value) }),
+    body('gender', 'please pass valid gender details').isString().isIn(["Male", "Female", "Other"]),
+    body('mobileNo', 'please pass valid mobile no').isString().isMobilePhone(),
+    body('status', 'please pass valid status').isNumeric()
+    ]
+    , checkErr, async (req, res) => {
+        try {
+            const { name, email, dob, gender, mobileNo, status } = req.body;
+
+            let checkExist = await userSchema.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { email: email },
+                            { mobileNo: mobileNo }
+                        ]
+                    }
+                }
+            ]);
+
+            if (checkExist.length > 0) {
+                return res.status(409).json({ issuccess: true, data: { acknowledgement: false }, message: "user already exist" });
+            }
+
+            // const userLoginIs = new userLogin({
+            //   userName: userName,
+            //   password: password
+            // });
+
+            // await userLoginIs.save();
+
+            const userIs = new userSchema({
+                email: email,
+                mobileNo: mobileNo,
+                name: name,
+                dob: dob,
+                gender: gender,
+                status: status
+            });
+
+            await userIs.save();
+
+            otp = getRandomIntInclusive(111111, 999999);
+
+            console.log(otp);
+            let update = await userSchema.findByIdAndUpdate(userIs._id, { otp: otp, generatedTime: getCurrentDateTime24('Asia/Kolkata') })
+            let message = `<h1>Hello Dear User</h1><br/><br/><p>welcome to the delux laundry service you can use our service more effectively by using our app delux lundry service`
+            await main(email, message);
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { email: userIs.email, role: userIs.role, isEmailVerified: userIs.isEmailVerified, isMobileVerified: userIs.isMobileVerified, id: userIs._id }, otp: otp }, messsage: "user successfully signed up" });;
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
 router.put('/updateMembershipDetails', authenticateToken, checkUserRole(['superAdmin']), uploadProfileImageToS3('membership').single('image'),
     [body('name').optional().isString().withMessage("please pass valid membership title"),
     body('month').optional().isNumeric().withMessage("please pass monthly price"),
