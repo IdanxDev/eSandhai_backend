@@ -63,7 +63,15 @@ const invoiceSchema = mongoose.Schema({
         type: Map,
         of: Number
     },
+    couponId: {
+        type: mongoose.Types.ObjectId,
+        ref: "coupons"
+    },
     finalAmount: {
+        type: Number,
+        default: 0
+    },
+    orderTotalAmount: {
         type: Number,
         default: 0
     },

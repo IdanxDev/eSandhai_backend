@@ -2401,9 +2401,6 @@ router.post('/addOrder', authenticateToken, async (req, res, next) => {
         }
         console.log(totalAmount);
         //check for 15$ validation
-        if (checkSubscription != undefined && 'isSubscription' in checkSubscription && 'isMember' in checkSubscription && checkSubscription.isSubscription == false && checkSubscription.isMember == false && totalAmount < 15) {
-            return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
-        }
 
         let taxes = await taxSchema.findOne({ isSubscription: checkSubscription[0].isSubscription, isMember: checkSubscription[0].isMember })
         console.log(taxes);
@@ -2543,12 +2540,22 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
 })
 router.put('/updateOrder', authenticateToken, authenticateToken, async (req, res, next) => {
     try {
-        const { addressId, status, orderId, paymentId, note } = req.body;
+        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note } = req.body;
         let checkOrder = await invoiceSchema.findById(orderId);
+        let checkSubscription = await checkUserSubscriptionMember(userId);
+
         if (checkOrder != undefined && checkOrder != null) {
+            if (status == 1) {
+                if (checkSubscription != undefined && 'isSubscription' in checkSubscription && 'isMember' in checkSubscription && checkSubscription.isSubscription == false && checkSubscription.isMember == false && totalAmount < 15) {
+                    return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
+                }
+            }
             let update = {
                 status: status,
-                addressId: addressId,
+                deliveryInstruction: deliveryInstruction,
+                pickupInstruction: pickupInstruction,
+                pickupAddressId: pickupAddressId,
+                deliveryAddressId: deliveryAddressId,
                 paymentId: paymentId,
                 note: note
             }

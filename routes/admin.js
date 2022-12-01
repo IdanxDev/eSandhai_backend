@@ -756,7 +756,7 @@ router.get('/getAdminProfile', authenticateToken, checkUserRole(['superAdmin', '
 })
 router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
     try {
-        const { userId } = req.body;
+        const { userId } = req.query;
         let match;
         let anotherMatch = [];
         if ('name' in req.query) {
