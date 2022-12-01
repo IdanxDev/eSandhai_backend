@@ -180,7 +180,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.put('/updateOrder', authenticateToken, authenticateToken, async (req, res, next) => {
+router.put('/updateOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note } = req.body;
         let checkOrder = await invoiceSchema.findById(orderId);
@@ -698,7 +698,10 @@ router.get('/getPickUpDays', authenticateToken, async (req, res) => {
             {
                 $addFields: {
                     dayNo: { $dayOfWeek: "$dateType" },
-                    monthNo: { $month: "$dateType" }
+                    monthNo: { $month: "$dateType" },
+                    dateOnly: {
+                        $dayOfMonth: "$dateType"
+                    }
                 }
             },
             {
