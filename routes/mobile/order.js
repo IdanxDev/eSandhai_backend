@@ -9,12 +9,13 @@ const userSchema = require('../../models/userModel');
 const { getCurrentDateTime24, makeid } = require('../../utility/dates');
 const nodemailer = require("nodemailer");
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember } = require('../../utility/expiration');
+const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember, getDateArray, nextDays } = require('../../utility/expiration');
 const { generateAccessToken, authenticateToken, generateRefreshToken, checkUserRole } = require('../../middleware/auth');
 const taxSchema = require('../../models/taxSchema')
 const invoiceSchema = require('../../models/invoiceSchema');
 const orderItems = require('../../models/orderItems');
 const itemSchema = require('../../models/itemSchema');
+const dayWiseSchema = require('../../models/dayWiseSchema');
 router.post('/addOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupTimeId, deliveryTimeId, pickupInstruction, deliveryInstruction, pickupAddressId, deliveryAddressId, items } = req.body;
