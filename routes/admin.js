@@ -395,6 +395,59 @@ router.post('/resendOtpUsingId', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getUserAddress', authenticateToken, checkUserRole(['superAdmin']), async (req, res, next) => {
+    try {
+        const userId = req.query.userId
+        let match;
+        let anotherMatch = [];
+        if ('isActive' in req.query) {
+            anotherMatch.push({ isActive: req.query.isActive === 'true' })
+        }
+        if ('addressId' in req.query) {
+            anotherMatch.push({ _id: mongoose.Types.ObjectId(req.query.addressId) });
+        }
+        if (userId != undefined) {
+            anotherMatch.push({
+                userId: mongoose.Types.ObjectId(userId)
+            })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        // console.log(userId)
+        let getAddress = await addressSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ]);
+
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getAnalytics', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
     try {
         const userId = req.user._id

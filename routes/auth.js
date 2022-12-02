@@ -1688,39 +1688,6 @@ router.get('/getUsers', authenticateToken, checkUserRole(['superAdmin']), async 
     ])
     return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
 })
-router.get('/getUserAddress', authenticateToken, checkUserRole(['superAdmin']), async (req, res, next) => {
-    try {
-        const userId = req.query.id
-        console.log(userId)
-        let getAddress = await addressSchema.aggregate([
-            {
-                $match: {
-                    $and: [
-                        { userId: mongoose.Types.ObjectId(userId) },
-                        { isActive: true }
-                    ]
-                }
-            },
-            {
-                $addFields: {
-                    "id": "$_id"
-                }
-            },
-            {
-                $project: {
-                    _id: 0,
-                    __v: 0
-                }
-            }
-        ]);
-
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "address found" : "address not found" });
-
-    } catch (error) {
-        console.log(error.message);
-        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
-    }
-})
 router.get('/getUserSubscription', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.query.id
