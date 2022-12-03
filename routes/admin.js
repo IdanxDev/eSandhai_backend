@@ -4051,12 +4051,13 @@ router.post('/addOrderItem', authenticateToken, checkUserRole(['superAdmin', 'ad
                 console.log(qty);
             }
             else if (checkItems.qty == qty) {
-                checkItems[0]['id'] = checkItems[0]['_id'];
-                delete checkItems[0].updatedAt;
-                delete checkItems[0].createdAt;
-                delete checkItems[0]._id;
-                delete checkItems[0].__v;
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateQty }, message: 'no quantity change' });
+                console.log("same");
+                checkItems._doc['id'] = checkItems._doc['_id'];
+                delete checkItems._doc.updatedAt;
+                delete checkItems._doc.createdAt;
+                delete checkItems._doc._id;
+                delete checkItems._doc.__v;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkItems[0] }, message: 'no quantity change' });
 
             }
 
