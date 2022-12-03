@@ -1186,7 +1186,7 @@ check('paymentId', 'please pass payment id').custom().isString().notEmpty(), che
 })
 router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
-        const { userId } = req.user._id
+        const userId = req.user._id
         console.log(userId);
         await checkExpireSubscription();
         let getAddress = await userSubscription.aggregate([
