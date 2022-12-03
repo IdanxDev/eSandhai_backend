@@ -19,7 +19,7 @@ const { checkErr } = require('../../utility/error');
 const userSubscription = require('../../models/userSubscription');
 const subscriptionSchema = require('../../models/subscriptionSchema');
 const bodySchema = require('../../models/bodySchema');
-const { checkUserSubscriptionMember } = require('../../utility/expiration');
+const { checkUserSubscriptionMember, checkExpireSubscription } = require('../../utility/expiration');
 const invoiceSchema = require('../../models/invoiceSchema');
 const contactUsSchema = require('../../models/contactUsSchema');
 /* GET home page. */
@@ -1112,7 +1112,7 @@ router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
 router.post('/addSubscription', authenticateToken, async (req, res, next) => {
     try {
         const { planId, duration } = req.body;
-        const userId = req.user._id;
+        const { userId } = req.body;
         let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
         // console.log(checkCategory);
         if (checkCategory == undefined || checkCategory == null) {
@@ -1120,7 +1120,7 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
         }
 
         let checkActiveSubscription = await userSubscription.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }] } }])
-        if (checkActiveSubscription != undefined && checkActiveSubscription != null) {
+        if (checkActiveSubscription != undefined && checkActiveSubscription != null && checkActiveSubscription.length > 0) {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `subscription already running` });
         }
 
@@ -1186,11 +1186,16 @@ check('paymentId', 'please pass payment id').custom().isString().notEmpty(), che
 })
 router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
-        const userId = req.user._id
+        const { userId } = req.query
+        console.log(userId);
+        await checkExpireSubscription();
         let getAddress = await userSubscription.aggregate([
             {
                 $match: {
-                    userId: mongoose.Types.ObjectId(userId)
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { status: 0 }
+                    ]
                 }
             },
             {
@@ -1256,27 +1261,31 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
                 }
             }
         ]);
-        let getPickups = await userSubscription.aggregate([
-            {
-                $match: {
-                    userId: mongoose.Types.ObjectId(userId)
-                }
-            },
-            {
-                $addFields: {
-                    "id": "$_id"
-                }
-            },
-            {
-                $group:
-                {
-                    _id: {},
-                    pickup: { $sum: "$pickup" },
-                    delivery: { $sum: "$delivery" }
-                }
-            },
-        ])
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress != undefined && getAddress.length > 0 ? Object.assign(getAddress[0], { pickup: getPickups[0].pickup, delivery: getPickups[0].delivery }) : [] }, message: getAddress.length > 0 ? "subscription found" : "no any active subscription" });
+        // let getPickups = await userSubscription.aggregate([
+        //     {
+        //         $match: {
+        //             $and: [
+        //                 { userId: mongoose.Types.ObjectId(userId) },
+        //                 { status: 0 }
+        //             ]
+        //         }
+        //     },
+        //     {
+        //         $addFields: {
+        //             "id": "$_id"
+        //         }
+        //     },
+        //     {
+        //         $group:
+        //         {
+        //             _id: {},
+        //             pickup: { $sum: "$pickup" },
+        //             delivery: { $sum: "$delivery" }
+        //         }
+        //     },
+        // ])
+        // console.log(getPickups);
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress.length > 0 ? getAddress[0] : {} }, message: getAddress.length > 0 ? "subscription found" : "no any active subscription" });
 
     } catch (error) {
         console.log(error.message);

@@ -131,8 +131,8 @@ exports.parseJwt = (token) => {
 exports.generateAccessToken = async (user) => {
     console.log("user token");
     console.log(user);
-    const generatedToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10d' })
-    const refreshToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '10d' })
+    const generatedToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '365d' })
+    const refreshToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '365d' })
     // console.log(generatedToken);
     // await client.set(user._id + "" + user.deviceId, refreshToken);
     return {
@@ -142,7 +142,7 @@ exports.generateAccessToken = async (user) => {
 
 //generate access token only using refreshtoken
 exports.generateAccessTokenOnly = async (user) => {
-    const generatedToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10d' })
+    const generatedToken = jwt.sign({ _id: user._id, role: user.role, time: Date.now() }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '365d' })
     return generatedToken;
 }
 

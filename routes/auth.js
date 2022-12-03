@@ -1711,7 +1711,11 @@ router.get('/getUserSubscription', authenticateToken, async (req, res, next) => 
         let getAddress = await userSubscription.aggregate([
             {
                 $match: {
-                    userId: mongoose.Types.ObjectId(userId)
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { status: 1 }
+                    ]
+
                 }
             },
             {
@@ -2056,7 +2060,7 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
         }
 
         let checkActiveSubscription = await userSubscription.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }] } }])
-        if (checkActiveSubscription != undefined && checkActiveSubscription != null) {
+        if (checkActiveSubscription != undefined && checkActiveSubscription != null && checkActiveSubscription.length > 0) {
             return res.status(403).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription already running` });
         }
 
@@ -2523,7 +2527,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.put('/updateOrder', authenticateToken, authenticateToken, async (req, res, next) => {
+router.put('/updateOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note } = req.body;
         let checkOrder = await invoiceSchema.findById(orderId);

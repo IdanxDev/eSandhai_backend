@@ -901,7 +901,8 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
 })
 router.post('/updateOrderItem', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
     try {
-        const { qty, amount, itemId, categoryId, orderId } = req.body;
+        const { amount, itemId, categoryId, orderId } = req.body;
+        let { qty } = req.body;
         const userId = req.user._id;
         let checkItems = await orderItems.findOne({ itemId: mongoose.Types.ObjectId(itemId), orderId: mongoose.Types.ObjectId(orderId) });
         if (checkItems != null && checkItems != undefined) {
@@ -4004,9 +4005,10 @@ router.post('/addOrder', authenticateToken, checkUserRole(['superAdmin', 'admin'
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
+router.post('/addOrderItem', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
     try {
-        const { qty, itemId, categoryId, orderId } = req.body;
+        const { itemId, categoryId, orderId } = req.body;
+        let { qty } = req.body;
         const { userId } = req.body;
         let taxApplied = {}
         let getOrder = await invoiceSchema.findById(orderId);
@@ -4038,6 +4040,9 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
         let finalAmount = qty * amount;
         let checkItems = await orderItems.findOne({ itemId: mongoose.Types.ObjectId(itemId), orderId: mongoose.Types.ObjectId(orderId) });
         if (checkItems != null && checkItems != undefined) {
+            if (checkItems.qty > qty) {
+                qty = 0 - qty;
+            }
             let updateQty;
             console.log("qty");
             console.log(checkItems.qty);
@@ -4475,23 +4480,23 @@ router.post('/getUserOrders', authenticateToken, checkUserRole(['superAdmin', 'a
                                 itemData: { $first: "$itemData" }
                             }
                         },
-                        {
-                            $group: {
-                                _id: "$categoryName",
-                                items: { $push: "$$ROOT" }
-                            }
-                        },
-                        {
-                            $addFields: {
-                                name: "$_id.name",
-                                categoryData: "$_id"
-                            }
-                        },
-                        {
-                            $project: {
-                                _id: 0
-                            }
-                        }
+                        // {
+                        //     $group: {
+                        //         _id: "$categoryName",
+                        //         items: { $push: "$$ROOT" }
+                        //     }
+                        // },
+                        // {
+                        //     $addFields: {
+                        //         name: "$_id.name",
+                        //         categoryData: "$_id"
+                        //     }
+                        // },
+                        // {
+                        //     $project: {
+                        //         _id: 0
+                        //     }
+                        // }
                     ],
                     as: "ordermItems"
                 }

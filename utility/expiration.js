@@ -48,7 +48,7 @@ exports.checkExpireSubscription = async () => {
     if (getAddressIs.length > 0) {
         for (i = 0; i < getAddressIs.length > 0; i++) {
             let update = await userSubscription.findByIdAndUpdate(getAddressIs[i]._id, { pendingDays: getAddressIs[i].pendingDays, usedDays: getAddressIs[i].usedDays }, { new: true });
-            console.log(update);
+            // console.log(update);
         }
     }
 }
