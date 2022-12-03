@@ -4040,9 +4040,27 @@ router.post('/addOrderItem', authenticateToken, checkUserRole(['superAdmin', 'ad
         let finalAmount = qty * amount;
         let checkItems = await orderItems.findOne({ itemId: mongoose.Types.ObjectId(itemId), orderId: mongoose.Types.ObjectId(orderId) });
         if (checkItems != null && checkItems != undefined) {
+            console.log(checkItems);
             if (checkItems.qty > qty) {
-                qty = 0 - qty;
+                console.log("zero minus");
+                qty = 0 - (checkItems.qty - qty);
+                console.log(qty);
             }
+            else if (checkItems.qty < qty) {
+                qty = qty - checkItems.qty;
+                console.log(qty);
+            }
+            else if (checkItems.qty == qty) {
+                checkItems[0]['id'] = checkItems[0]['_id'];
+                delete checkItems[0].updatedAt;
+                delete checkItems[0].createdAt;
+                delete checkItems[0]._id;
+                delete checkItems[0].__v;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateQty }, message: 'no quantity change' });
+
+            }
+
+            let finalAmount = qty * amount;
             let updateQty;
             console.log("qty");
             console.log(checkItems.qty);
