@@ -1244,6 +1244,23 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                                 itemData: { $first: "$itemData" }
                             }
                         },
+                        {
+                            $group: {
+                                _id: "$categoryName",
+                                items: { $push: "$$ROOT" }
+                            }
+                        },
+                        {
+                            $addFields: {
+                                name: "$_id.name",
+                                categoryData: "$_id"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0
+                            }
+                        }
                     ],
                     as: "ordermItems"
                 }
@@ -2345,6 +2362,7 @@ router.post('/addOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupTimeId, deliveryTimeId, pickupInstruction, deliveryInstruction, pickupAddressId, deliveryAddressId, items } = req.body;
         const userId = req.user._id;
+        // console.log(userId);
         let checkSubscription = await checkUserSubscriptionMember(userId);
         let totalAmount = 0;
         let payableAmount = 0;
