@@ -370,7 +370,7 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
                             $addFields: {
                                 itemData: { $first: "$itemData" }
                             }
-                        },
+                        }
                     ],
                     as: "ordermItems"
                 }

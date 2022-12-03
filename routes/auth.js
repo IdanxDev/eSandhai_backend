@@ -2131,7 +2131,7 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
                 $match: {
                     $and: [
                         { userId: mongoose.Types.ObjectId(userId) },
-                        { status: { $nin: [2, 3] } }
+                        { status: 0 }
                     ]
                 }
             },
