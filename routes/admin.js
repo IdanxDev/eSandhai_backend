@@ -2533,27 +2533,72 @@ router.delete('/removeHoliday', authenticateToken, checkUserRole(['superAdmin'])
     })
 router.get('/getActiveDays', authenticateToken, async (req, res) => {
     try {
-        const { date } = req.query;
-        let getHoliday = await holidaySchema.findOne({ date: date });
-        console.log(getHoliday);
-        if (getHoliday != null && getHoliday != undefined) {
-            let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
-            console.log(checkExist);
-            if (checkExist.length > 0) {
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+        const { date, dateTimeId, isActive, isHalfHoliday, isFullHoliday } = req.query;
+        let anotherMatch = [];
+        if (date != undefined && date != null) {
+            anotherMatch.push({ date: date })
+        }
+        if (dateTimeId != undefined && dateTimeId != null) {
+            anotherMatch.push({ _id: mongoose.Types.ObjectId(dateTimeId) })
+        }
+        if (isActive != undefined && isActive != null) {
+            anotherMatch.push({ isActive: isActive === 'true' })
+        }
+        if (isHalfHoliday != undefined && isHalfHoliday != null) {
+            anotherMatch.push({ isHalfHoliday: isHalfHoliday === 'true' })
+        }
+        if (isFullHoliday
+            != undefined && isFullHoliday != null) {
+            anotherMatch.push({ isFullHoliday: isFullHoliday === 'true' })
+        }
+        console.log(anotherMatch);
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
             }
-            let addDay = new activeDays({ date: getHoliday.date, timeSlots: getHoliday.timeSlots, isFullHoliday: getHoliday.isFullHoliday });
-            await addDay.save();
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} status found` });
         }
-        let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
-        if (checkExist.length > 0) {
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+        else {
+            match = {
+                $match: {
+                }
+            }
         }
-        let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: true, time: { $concat: ["$start", " - ", "$end"] } } }]);
-        let addDay = new activeDays({ date: date, timeSlots: getTimeRange });
-        await addDay.save();
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} holiday successfully added` });
+        let getDate = await dayWiseSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ])
+        // let getHoliday = await holidaySchema.findOne({ date: date });
+        // console.log(getHoliday);
+        // if (getHoliday != null && getHoliday != undefined) {
+        //     let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
+        //     console.log(checkExist);
+        //     if (checkExist.length > 0) {
+        //         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+        //     }
+        //     let addDay = new activeDays({ date: getHoliday.date, timeSlots: getHoliday.timeSlots, isFullHoliday: getHoliday.isFullHoliday });
+        //     await addDay.save();
+        //     return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addDay }, message: `${date} status found` });
+        // }
+        // let checkExist = await activeDays.aggregate([{ $match: { date: date } }]);
+        // if (checkExist.length > 0) {
+        //     return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkExist[0] }, message: `${date} status found` });
+        // }
+        // let getTimeRange = await timeSchema.aggregate([{ $addFields: { isActive: true, time: { $concat: ["$start", " - ", "$end"] } } }]);
+        // let addDay = new activeDays({ date: date, timeSlots: getTimeRange });
+        // await addDay.save();
+        return res.status(200).json({ issuccess: getDate.length > 0 ? true : false, data: { acknowledgement: getDate.length > 0 ? true : false, data: getDate }, message: getDate.length > 0 ? `date slots found` : `no any date slots found` });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
@@ -2582,6 +2627,92 @@ router.get('/getPickUpDays', authenticateToken, async (req, res) => {
         // console.log(currentDate);
         let getNextDays = await nextDays(currentDate)
         console.log(getNextDays);
+        let getDays = await dayWiseSchema.aggregate([
+            {
+                $match: {
+                    date: { $in: getNextDays }
+                }
+            },
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0
+                }
+            },
+            {
+                $group: {
+                    _id: { date: "$date" },
+                    timeSlots: { $push: "$$ROOT" }
+                }
+            },
+            {
+                $addFields: {
+                    date: "$_id.date",
+                    dateType: {
+                        $dateFromString: {
+                            dateString: "$_id.date",
+                            format: "%d/%m/%Y",
+                            timezone: "-04:00"
+                        }
+                    }
+                }
+            },
+            {
+                $sort: {
+                    dateType: 1
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    dateType: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getDays }, message: `data found for next 7 days` });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getDeliveryDays', authenticateToken, async (req, res) => {
+    try {
+
+        // console.log(moment()
+        //     .tz('America/Panama')
+        //     .format("DD/MM/YYYY"));
+        // console.log(moment()
+        //     .tz('America/Panama')
+        //     .format("H:mm:ss"));
+
+        const userId = req.user._id;
+        const { dateTimeId } = req.query;
+        let getdateTimeData = await dayWiseSchema.findById(dateTimeId);
+        if (getdateTimeData == null || getdateTimeData == undefined) {
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `datetime not found any` });
+        }
+        let dateIs = getdateTimeData.date.split("/");
+        // console.log(dateIs[0]);
+        let currentDate = moment(Date.parse(`2022-12-07T16:01:00Z`)).tz('America/Panama')
+        let timeDateIs = moment(Date.parse(`${dateIs[2]}-${dateIs[1]}-${dateIs[0]}T16:00:00Z`)).tz('America/Panama')
+        // console.log(currentDate);
+        // console.log(currentDate.format("DD/MM/YYYY,h:mm:ss a"));
+        // console.log(timeDateIs.format("DD/MM/YYYY,h:mm:ss a"));
+        let checkSubscription = await checkUserSubscriptionMember(userId)
+        // checkSubscription[0].isMember = true
+        // console.log(checkSubscription);
+        // console.log("subscription");
+        // console.log(checkSubscription);
+        if (checkSubscription.length > 0 && 'isSubscription' in checkSubscription[0] && 'isMember' in checkSubscription[0] && checkSubscription[0].isMember == true && currentDate > timeDateIs) {
+            currentDate = currentDate.add(1, 'day');
+        }
+        // console.log(currentDate);
+        let getNextDays = await nextDays(currentDate)
+        // console.log(getNextDays);
         let getDays = await dayWiseSchema.aggregate([
             {
                 $match: {
