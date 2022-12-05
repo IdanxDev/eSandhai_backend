@@ -2697,8 +2697,8 @@ router.get('/getDeliveryDays', authenticateToken, async (req, res) => {
         }
         let dateIs = getdateTimeData.date.split("/");
         // console.log(dateIs[0]);
-        let currentDate = moment(Date.parse(`2022-12-07T16:01:00Z`)).tz('America/Panama')
-        let timeDateIs = moment(Date.parse(`${dateIs[2]}-${dateIs[1]}-${dateIs[0]}T16:00:00Z`)).tz('America/Panama')
+        let currentDate = moment(Date.parse(`${dateIs[2]}-${dateIs[1]}-${dateIs[0]}T16:00:00Z`)).tz('America/Panama')
+        let timeDateIs = moment().tz('America/Panama')
         // console.log(currentDate);
         // console.log(currentDate.format("DD/MM/YYYY,h:mm:ss a"));
         // console.log(timeDateIs.format("DD/MM/YYYY,h:mm:ss a"));
@@ -2707,7 +2707,10 @@ router.get('/getDeliveryDays', authenticateToken, async (req, res) => {
         // console.log(checkSubscription);
         // console.log("subscription");
         // console.log(checkSubscription);
-        if (checkSubscription.length > 0 && 'isSubscription' in checkSubscription[0] && 'isMember' in checkSubscription[0] && checkSubscription[0].isMember == true && currentDate > timeDateIs) {
+        if (checkSubscription.length > 0 && 'isSubscription' in checkSubscription[0] && 'isMember' in checkSubscription[0] && checkSubscription[0].isMember == true && timeDateIs > currentDate) {
+            currentDate = currentDate.add(1, 'day');
+        }
+        else {
             currentDate = currentDate.add(1, 'day');
         }
         // console.log(currentDate);

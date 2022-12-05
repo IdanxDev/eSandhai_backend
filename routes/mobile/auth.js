@@ -467,6 +467,69 @@ router.put('/updateDeluxMembership', authenticateToken, async (req, res, next) =
         if (checkCategory == undefined || checkCategory == null) {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership details not found` });
         }
+        if (status == 1) {
+            await checkExpireSubscription();
+            let getAddress = await userSubscription.aggregate([
+                {
+                    $match: {
+                        $and: [
+                            { userId: mongoose.Types.ObjectId(userId) },
+                            { status: 0 }
+                        ]
+                    }
+                },
+                {
+                    $addFields: {
+                        "id": "$_id"
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "subscriptions",
+                        let: { id: "$planId" },
+                        pipeline: [{
+                            $match: {
+                                $expr: {
+                                    $eq: ["$_id", "$$id"]
+                                }
+                            }
+                        },
+                        {
+                            $addFields: {
+                                "id": "$_id"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                __v: 0,
+                                isVisible: 0,
+                                createdAt: 0,
+                                updatedAt: 0
+                            }
+                        }],
+                        as: "planDetails"
+                    }
+                },
+                {
+                    $addFields: {
+                        planDetails: { $first: "$planDetails" }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        __v: 0,
+                        createdAt: 0,
+                        updatedAt: 0
+                    }
+                }
+            ]);
+            console.log(getAddress);
+            if (getAddress.length > 0) {
+                let update = await userSubscription.findByIdAndUpdate(getAddress[0]._id, { $inc: { pickup: 1, delivery: 1 } }, { new: true })
+            }
+        }
         let update = {
             paymentId: paymentId,
             status: status,
@@ -1194,7 +1257,7 @@ router.get('/getSubscription', authenticateToken, async (req, res, next) => {
                 $match: {
                     $and: [
                         { userId: mongoose.Types.ObjectId(userId) },
-                        { status: 0 }
+                        { status: 1 }
                     ]
                 }
             },
