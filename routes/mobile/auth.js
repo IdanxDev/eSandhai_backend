@@ -19,9 +19,12 @@ const { checkErr } = require('../../utility/error');
 const userSubscription = require('../../models/userSubscription');
 const subscriptionSchema = require('../../models/subscriptionSchema');
 const bodySchema = require('../../models/bodySchema');
-const { checkUserSubscriptionMember, checkExpireSubscription } = require('../../utility/expiration');
+const { checkUserSubscriptionMember, checkExpireSubscription, nextDays, checkExpireMemberShip } = require('../../utility/expiration');
 const invoiceSchema = require('../../models/invoiceSchema');
 const contactUsSchema = require('../../models/contactUsSchema');
+const dayWiseSchema = require('../../models/dayWiseSchema');
+const membershipDetails = require('../../models/membershipDetails');
+const membershipSchema = require('../../models/membershipSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -1215,6 +1218,171 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
 
     } catch (error) {
         console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getPickUpDays', authenticateToken, async (req, res) => {
+    try {
+        // console.log(moment()
+        //     .tz('America/Panama')
+        //     .format("DD/MM/YYYY"));
+        // console.log(moment()
+        //     .tz('America/Panama')
+        //     .format("H:mm:ss"));
+        const userId = req.user._id;
+        let currentDate = moment()
+            .tz('America/Panama')
+        let checkSubscription = await checkUserSubscriptionMember(userId)
+        // console.log("subscription");
+        // console.log(checkSubscription);
+        if (checkSubscription.length > 0 && 'isSubscription' in checkSubscription[0] && 'isMember' in checkSubscription[0] && checkSubscription[0].isSubscription == true && checkSubscription[0].isMember == true) {
+
+        }
+        else {
+            console.log("else");
+            currentDate = currentDate.add(1, 'day');
+        }
+        // console.log(currentDate);
+        let getNextDays = await nextDays(currentDate)
+        console.log(getNextDays);
+        let getDays = await dayWiseSchema.aggregate([
+            {
+                $match: {
+                    date: { $in: getNextDays }
+                }
+            },
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0
+                }
+            },
+            {
+                $group: {
+                    _id: { date: "$date" },
+                    timeSlots: { $push: "$$ROOT" }
+                }
+            },
+            {
+                $addFields: {
+                    date: "$_id.date",
+                    dateType: {
+                        $dateFromString: {
+                            dateString: "$_id.date",
+                            format: "%d/%m/%Y",
+                            timezone: "-04:00"
+                        }
+                    }
+                }
+            },
+            {
+                $sort: {
+                    dateType: 1
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    dateType: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getDays }, message: `data found for next 7 days` });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getDeliveryDays', authenticateToken, async (req, res) => {
+    try {
+
+        // console.log(moment()
+        //     .tz('America/Panama')
+        //     .format("DD/MM/YYYY"));
+        // console.log(moment()
+        //     .tz('America/Panama')
+        //     .format("H:mm:ss"));
+
+        const userId = req.user._id;
+        const { dateTimeId } = req.query;
+        let getdateTimeData = await dayWiseSchema.findById(dateTimeId);
+        if (getdateTimeData == null || getdateTimeData == undefined) {
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `datetime details not found` });
+        }
+        let dateIs = getdateTimeData.date.split("/");
+        // console.log(dateIs[0]);
+        let currentDate = moment(Date.parse(`${dateIs[2]}-${dateIs[1]}-${dateIs[0]}T16:00:00Z`)).tz('America/Panama')
+        let timeDateIs = moment().tz('America/Panama')
+        // console.log(currentDate);
+        // console.log(currentDate.format("DD/MM/YYYY,h:mm:ss a"));
+        // console.log(timeDateIs.format("DD/MM/YYYY,h:mm:ss a"));
+        let checkSubscription = await checkUserSubscriptionMember(userId)
+        // checkSubscription[0].isMember = true
+        // console.log(checkSubscription);
+        // console.log("subscription");
+        // console.log(checkSubscription);
+        if (checkSubscription.length > 0 && 'isSubscription' in checkSubscription[0] && 'isMember' in checkSubscription[0] && checkSubscription[0].isMember == true && timeDateIs > currentDate) {
+            currentDate = currentDate.add(1, 'day');
+        }
+        else {
+            currentDate = currentDate.add(1, 'day');
+        }
+        // console.log(currentDate);
+        let getNextDays = await nextDays(currentDate)
+        // console.log(getNextDays);
+        let getDays = await dayWiseSchema.aggregate([
+            {
+                $match: {
+                    date: { $in: getNextDays }
+                }
+            },
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0
+                }
+            },
+            {
+                $group: {
+                    _id: { date: "$date" },
+                    timeSlots: { $push: "$$ROOT" }
+                }
+            },
+            {
+                $addFields: {
+                    date: "$_id.date",
+                    dateType: {
+                        $dateFromString: {
+                            dateString: "$_id.date",
+                            format: "%d/%m/%Y",
+                            timezone: "-04:00"
+                        }
+                    }
+                }
+            },
+            {
+                $sort: {
+                    dateType: 1
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    dateType: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getDays }, message: `data found for next 7 days` });
+    } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
