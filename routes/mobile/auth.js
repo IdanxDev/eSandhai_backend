@@ -422,7 +422,7 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
 
 router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => {
     try {
-        const { detailId, duration } = req.body;
+        const { detailId, duration, paymentId } = req.body;
         const userId = req.user._id;
         let checkCategory = await membershipDetails.findById(detailId);
         // console.log(checkCategory);
@@ -442,6 +442,8 @@ router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => 
             startDate: moment(),
             endDate: moment().add(pendingDays, 'days'),
             orderId: orderId,
+            paymentId: paymentId,
+            status: 1,
             pendingDays: pendingDays,
             usedDays: 0
         })
@@ -1177,7 +1179,7 @@ router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
 })
 router.post('/addSubscription', authenticateToken, async (req, res, next) => {
     try {
-        const { planId, duration } = req.body;
+        const { planId, duration, paymentId } = req.body;
         const { userId } = req.body;
         let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
         // console.log(checkCategory);
@@ -1195,6 +1197,7 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
         let createAddress = new userSubscription({
             planId: planId,
             userId: userId,
+            paymentId: paymentId,
             orderId: orderId,
             pickup: checkCategory.pickup,
             delivery: checkCategory.delivery,
@@ -1202,6 +1205,7 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
             duration: duration,
             pendingDays: pendingDays,
             usedDays: 0,
+            status: 1,
             startDate: moment(),
             endDate: moment().add(pendingDays, 'days')
         })
@@ -1417,8 +1421,8 @@ check('paymentId', 'please pass payment id').custom().isString().notEmpty(), che
 })
 router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
-        const userId = req.user._id
-        console.log(userId);
+        const userId = req.query.userId
+        // console.log(userId);
         await checkExpireSubscription();
         let getAddress = await userSubscription.aggregate([
             {
