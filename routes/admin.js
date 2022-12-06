@@ -4268,7 +4268,8 @@ router.put('/updateOrder', authenticateToken, checkUserRole(['superAdmin', 'admi
             if (status == 3 && riderId != undefined && [2, 4].includes(checkOrder.status)) {
                 let addPickup = new pickupDeliverySchema({
                     orderId: orderId,
-                    riderId: riderId
+                    riderId: riderId,
+                    rideId: "R" + riderId.substring(riderId.length - 4, riderId.length) + makeid(8)
                 })
                 await addPickup.save();
                 // let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: status, riderId: riderId }, { new: true });
@@ -4277,6 +4278,7 @@ router.put('/updateOrder', authenticateToken, checkUserRole(['superAdmin', 'admi
                 let addPickup = new pickupDeliverySchema({
                     orderId: orderId,
                     riderId: riderId,
+                    riderId: "R" + riderId.substring(riderId.length - 4, riderId.length) + makeid(8),
                     rideType: 1
                 })
                 await addPickup.save();

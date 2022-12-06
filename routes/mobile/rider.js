@@ -20,6 +20,8 @@ const subscriptionSchema = require('../../models/subscriptionSchema')
 const riderSchema = require('../../models/riderSchema');
 const { uploadProfileImageToS3, removeObject } = require('../../utility/aws');
 const vehicleSchema = require('../../models/vehicleSchema');
+const pickupDeliverySchema = require('../../models/pickupDeliverySchema');
+const invoiceSchema = require('../../models/invoiceSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -209,6 +211,104 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
         delete updateRider._doc.generatedTime;
         delete updateRider._doc.otp;
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateRider }, message: "user details updated" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
+    try {
+        const userId = req.query.riderId
+
+        const checkUser = await pickupDeliverySchema.aggregate([
+            {
+                $match: {
+                    riderId: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $lookup: {
+                    from: "invoices",
+                    let: { orderId: "$orderId" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } },
+
+                    {
+                        $lookup: {
+                            from: "daywises",
+                            let: { orderId: "$pickupTimeId" },
+                            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }],
+                            as: "pickupTimeData"
+                        }
+                    },
+
+                    {
+                        $lookup: {
+                            from: "daywises",
+                            let: { orderId: "$deliveryTimeId" },
+                            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }],
+                            as: "deliveryTimeData"
+                        }
+                    },
+                    {
+                        $addFields: {
+                            isSameDay: { $cond: [{ $eq: [{ $first: "$pickupTimeData.date" }, { $first: "$deliveryTimeData.date" }] }, true, false] }
+                        }
+                    }
+                    ],
+                    as: "orderData"
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id",
+                    rideType: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$rideType", 0] }, then: "Pickup" },
+                                { case: { $gt: ["$rideType", 1] }, then: "Delivery" },
+                                { case: { $gt: ["$rideType", 2] }, then: "Return" }
+                            ],
+                            default: "Did not match"
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    "createdAt": 0,
+                    "updatedAt": 0,
+                    "_id": 0,
+                    "__v": 0,
+                    "otp": 0
+                }
+            }
+        ]);
+        if (checkUser.length == 0) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no any order assigned" });
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser }, message: "order found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateSlots', authenticateToken, checkUserRole(["rider"]), [body('rideId', 'please enter valid ridd Id').custom((value) => mongoose.Types.ObjectId.isValid(value)), body('status', 'please pass valid status code').isNumeric().isIn([2, 3, 4])], checkErr, async (req, res, next) => {
+    try {
+        const userId = req.query.riderId
+        const { rideId, status } = req.body
+        const checkUser = await pickupDeliverySchema.findById(rideId)
+        if (checkUser == undefined || checkUser == null) {
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no any order assigned" });
+        }
+        if (status == 2) {
+            let updateInvoice = await invoiceSchema.findByIdAndUpdate(checkUser.orderId, { status: 5 }, { new: true });
+        }
+        else if (status == 3) {
+            let updateInvoice = await invoiceSchema.findByIdAndUpdate(checkUser.orderId, { status: 4 }, { new: true });
+        }
+        else if (status == 4) {
+            let updateInvoice = await invoiceSchema.findByIdAndUpdate(checkUser.orderId, { status: 4 }, { new: true });
+        }
+        let updateRide = await pickupDeliverySchema.findByIdAndUpdate(rideId, { status: status }, { new: true });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser }, message: "order updated" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

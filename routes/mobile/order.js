@@ -448,6 +448,7 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
     try {
         const { orderId } = req.query;
         const userId = req.user._id;
+        console.log(userId);
         let match;
         let anotherMatch = [];
         // if ('name' in req.query) {
@@ -510,6 +511,32 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                     let: { userId: "$userId" },
                     pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }],
                     as: "userData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { orderId: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$orderId", "$$orderId"] }, { $eq: ["$rideType", 0] }] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "pickupSlot"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { orderId: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$orderId", "$$orderId"] }, { $eq: ["$rideType", 1] }] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "deliverySlot"
                 }
             },
             {
@@ -593,8 +620,8 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                     amount: "$orderAmount",
                     name: { $first: "$userData.name" },
                     addressData: { $first: "$addressData" },
-                    deliveryTime: { $first: "$deliveryTime.timeSlot" },
-                    pickupTime: { $first: "$pickupTime.timeSlot" }
+                    deliveryTime: { $first: "$deliverySlot" },
+                    pickupTime: { $first: "$pickupSlot" }
                 }
             },
             {

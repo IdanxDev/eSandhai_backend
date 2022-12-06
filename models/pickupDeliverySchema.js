@@ -5,6 +5,10 @@ const pickupDeliverySchema = mongoose.Schema({
         type: mongoose.Types.ObjectId,
         ref: "riders"
     },
+    rideId: {
+        type: String,
+        default: ""
+    },
     startCordinates: [{
         type: Number
     }],
@@ -28,12 +32,12 @@ const pickupDeliverySchema = mongoose.Schema({
     //0==Assigned
     //1==out
     //2==complete
-    //3==fail
-    //4==failed for pickup
-    //5==cancelled by rider
+    //3==failed for pickup
+    //4==cancelled by rider
     status: {
         type: Number,
-        default: 0
+        default: 0,
+        enum: [0, 1, 2, 3, 4]
     },
     orderId: {
         type: mongoose.Types.ObjectId,

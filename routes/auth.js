@@ -1207,6 +1207,22 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
             },
             {
                 $lookup: {
+                    from: "pickupdeliveries",
+                    let: { orderId: "$id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$orderId", "$$orderId"] }, { $eq: ["$riderType", 0] }] } } }],
+                    as: "pickupSlot"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { orderId: "$id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$orderId", "$$orderId"] }, { $eq: ["$riderType", 1] }] } } }],
+                    as: "deliverySlot"
+                }
+            },
+            {
+                $lookup: {
                     from: "orderitems",
                     let: { id: "$_id" },
                     pipeline: [
