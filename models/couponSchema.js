@@ -18,6 +18,10 @@ const couponSchema = mongoose.Schema({
     end: {
         type: Date
     },
+    isOnce: {
+        type: Boolean,
+        default: true
+    },
     isVisible: {
         type: Boolean,
         default: true

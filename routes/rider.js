@@ -19,6 +19,7 @@ const userSubscription = require('../models/userSubscription');
 const subscriptionSchema = require('../models/subscriptionSchema')
 const riderSchema = require('../models/riderSchema');
 const { uploadProfileImageToS3, removeObject } = require('../utility/aws');
+const pickupDeliverySchema = require('../models/pickupDeliverySchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -208,6 +209,39 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
         delete updateRider._doc.generatedTime;
         delete updateRider._doc.otp;
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateRider }, message: "user details updated" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getAssignedOrders', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+
+        const checkUser = await pickupDeliverySchema.aggregate([
+            {
+                $match: {
+                    riderId: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $project: {
+                    "createdAt": 0,
+                    "updatedAt": 0,
+                    "_id": 0,
+                    "__v": 0,
+                    "otp": 0
+                }
+            }
+        ]);
+        if (checkUser.length == 0) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no any order assigned" });
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser[0] }, message: "order found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

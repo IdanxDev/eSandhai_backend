@@ -2042,7 +2042,8 @@ router.get('/getSession', authenticateToken, async (req, res, next) => {
                 }
             }
         ]);
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getTimes }, message: "session details found" });
+        let lastOrder = await invoiceSchema.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: { $in: [0, 1] } }] } }])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign(getTimes[0], { lastOrderId: lastOrder[lastOrder.length - 1]._id }) }, message: "session details found" });
 
     } catch (error) {
         console.log(error.message);
@@ -2595,7 +2596,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
 })
 router.put('/updateOrder', authenticateToken, async (req, res, next) => {
     try {
-        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note } = req.body;
+        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, couponId, note } = req.body;
         let checkOrder = await invoiceSchema.findById(orderId);
         let checkSubscription = await checkUserSubscriptionMember(userId);
 
@@ -2605,6 +2606,7 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                     return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
                 }
             }
+
             let update = {
                 status: status,
                 deliveryInstruction: deliveryInstruction,

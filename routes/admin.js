@@ -39,6 +39,7 @@ const apkLinkSchema = require('../models/apkLinkSchema');
 const bannerSchema = require('../models/bannerSchema');
 const dayWiseSchema = require('../models/dayWiseSchema');
 const taxSchema = require('../models/taxSchema');
+const pickupDeliverySchema = require('../models/pickupDeliverySchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -2262,10 +2263,11 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body("start", "please provide start hours").notEmpty().isString(),
     body('end', "please provide ending hours").notEmpty().isString(),
     body('discount', "please provide discount value").notEmpty().isNumeric(),
+    body('isOnce', "please provide valid isOnce").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            let { name, description, start, discount, end, isVisible, terms } = req.body;
+            let { name, description, start, discount, end, isOnce, isVisible, terms } = req.body;
 
             let checkCategory = await couponSchema.findOne({ name: name });
 
@@ -2279,6 +2281,7 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
             console.log(startIs);
             let addCategory = new couponSchema({
                 name: name,
+                isOnce: isOnce,
                 description: description,
                 start: startIs,
                 end: endIs,
@@ -2304,12 +2307,13 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body("terms", "please provide valid terms").optional().notEmpty().isString(),
     body("start", "please provide start hours").optional().notEmpty().isString(),
     body('end', "please provide ending hours").optional().notEmpty().isString(),
+    body('isOnce', "please provide valid isOnce").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     body('couponId', "please pass valid coupon id").custom((value) => mongoose.Types.ObjectId.isValid(value))
     ], checkErr, checkErr, async (req, res) => {
         try {
             const { name,
-                description, terms, discount, start, end, isVisible, couponId } = req.body;
+                description, terms, discount, start, end, isOnce, isVisible, couponId } = req.body;
 
             let checkCategory = await couponSchema.findById(couponId);
             if (checkCategory == undefined || checkCategory == null) {
@@ -2327,6 +2331,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 name: name,
                 description: description,
                 terms: terms,
+                isOnce: isOnce,
                 start: startIs,
                 discount: discount,
                 end: endIs,
@@ -4249,9 +4254,10 @@ router.post('/addOrderItem', authenticateToken, checkUserRole(['superAdmin', 'ad
 })
 router.put('/updateOrder', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
     try {
-        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note } = req.body;
+        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note, riderId } = req.body;
+
         let checkOrder = await invoiceSchema.findById(orderId);
-        let checkSubscription = await checkUserSubscriptionMember(userId);
+        let checkSubscription = await checkUserSubscriptionMember(checkOrder.userId);
 
         if (checkOrder != undefined && checkOrder != null) {
             if (status == 1) {
@@ -4259,12 +4265,30 @@ router.put('/updateOrder', authenticateToken, checkUserRole(['superAdmin', 'admi
                     return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
                 }
             }
+            if (status == 3 && riderId != undefined && [2, 4].includes(checkOrder.status)) {
+                let addPickup = new pickupDeliverySchema({
+                    orderId: orderId,
+                    riderId: riderId
+                })
+                await addPickup.save();
+                // let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: status, riderId: riderId }, { new: true });
+            }
+            if (status == 7 && riderId != undefined && [7, 9].includes(checkOrder.status)) {
+                let addPickup = new pickupDeliverySchema({
+                    orderId: orderId,
+                    riderId: riderId,
+                    rideType: 1
+                })
+                await addPickup.save();
+                // let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: status, riderId: riderId }, { new: true });
+            }
             let update = {
                 status: status,
                 deliveryInstruction: deliveryInstruction,
                 pickupInstruction: pickupInstruction,
                 pickupAddressId: pickupAddressId,
                 deliveryAddressId: deliveryAddressId,
+                riderId: riderId,
                 paymentId: paymentId,
                 note: note
             }

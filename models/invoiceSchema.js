@@ -91,6 +91,10 @@ const invoiceSchema = mongoose.Schema({
         type: String,
         default: ""
     },
+    invoiceId: {
+        type: String,
+        default: ""
+    },
     paymentId: [String],
     note: String,
     pickupAddressId: {
