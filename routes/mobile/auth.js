@@ -554,6 +554,111 @@ router.put('/updateDeluxMembership', authenticateToken, async (req, res, next) =
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getNotifications', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        // await checkExpireMemberShip();
+        // let getAddress = await membershipSchema.aggregate([
+        //     {
+        //         $match: {
+        //             $and: [
+        //                 { userId: mongoose.Types.ObjectId(userId) },
+        //                 { status: { $nin: [2, 3] } }
+        //             ]
+        //         }
+        //     },
+        //     {
+        //         $addFields: {
+        //             "id": "$_id"
+        //         }
+        //     },
+        //     {
+        //         $lookup: {
+        //             from: "membershipdetails",
+        //             let: { id: "$membershipId" },
+        //             pipeline: [{
+        //                 $match: {
+        //                     $expr: {
+        //                         $eq: ["$_id", "$$id"]
+        //                     }
+        //                 }
+        //             },
+        //             {
+        //                 $addFields: {
+        //                     "id": "$_id"
+        //                 }
+        //             },
+        //             {
+        //                 $project: {
+        //                     _id: 0,
+        //                     __v: 0,
+        //                     isVisible: 0,
+        //                     createdAt: 0,
+        //                     updatedAt: 0
+        //                 }
+        //             }],
+        //             as: "membershipDetails"
+        //         }
+        //     },
+        //     {
+        //         $addFields: {
+        //             membershipDetails: { $first: "$membershipDetails" }
+        //         }
+        //     },
+        //     {
+        //         $project: {
+        //             _id: 0,
+        //             __v: 0,
+        //             createdAt: 0,
+        //             updatedAt: 0
+        //         }
+        //     }
+        // ]);
+
+        let getAddress = [
+            {
+                id: "638ba7353a10402074216990",
+                image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
+                title: "title",
+                description: "description",
+                createdAt: "2022-11-09T05:24:26.838Z"
+            },
+            {
+                id: "638ba7353a10402074216990",
+                image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
+                title: "title",
+                description: "description",
+                createdAt: "2022-11-09T05:24:26.838Z"
+            },
+            {
+                id: "638ba7353a10402074216990",
+                image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
+                title: "title",
+                description: "description",
+                createdAt: "2022-11-09T05:24:26.838Z"
+            },
+            {
+                id: "638ba7353a10402074216990",
+                image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
+                title: "title",
+                description: "description",
+                createdAt: "2022-11-09T05:24:26.838Z"
+            },
+            {
+                id: "638ba7353a10402074216990",
+                image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
+                title: "title",
+                description: "description",
+                createdAt: "2022-11-09T05:24:26.838Z"
+            }
+        ]
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getAddress }, message: getAddress.length > 0 ? "delux membership detail found" : "delux membership not found" });
+
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
