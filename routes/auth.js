@@ -2043,7 +2043,7 @@ router.get('/getSession', authenticateToken, async (req, res, next) => {
             }
         ]);
         let lastOrder = await invoiceSchema.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: { $in: [0, 1] } }] } }])
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign(getTimes[0], { lastOrderId: lastOrder[lastOrder.length - 1]._id }) }, message: "session details found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign(getTimes[0], { lastOrderId: lastOrder.length > 0 ? lastOrder[lastOrder.length - 1]._id : "" }) }, message: "session details found" });
 
     } catch (error) {
         console.log(error.message);
