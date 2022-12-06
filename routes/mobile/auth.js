@@ -1180,14 +1180,14 @@ router.delete('/removeAddress', authenticateToken, async (req, res, next) => {
 router.post('/addSubscription', authenticateToken, async (req, res, next) => {
     try {
         const { planId, duration, paymentId } = req.body;
-        const { userId } = req.body;
+        const userId = req.user._id;
         let checkCategory = await subscriptionSchema.findById(mongoose.Types.ObjectId(planId));
         // console.log(checkCategory);
         if (checkCategory == undefined || checkCategory == null) {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
         }
 
-        let checkActiveSubscription = await userSubscription.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }] } }])
+        let checkActiveSubscription = await userSubscription.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 1 }] } }])
         if (checkActiveSubscription != undefined && checkActiveSubscription != null && checkActiveSubscription.length > 0) {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `subscription already running` });
         }
@@ -1421,7 +1421,7 @@ check('paymentId', 'please pass payment id').custom().isString().notEmpty(), che
 })
 router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
-        const userId = req.query.userId
+        const userId = req.user._id
         // console.log(userId);
         await checkExpireSubscription();
         let getAddress = await userSubscription.aggregate([
