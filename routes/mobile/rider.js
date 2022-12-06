@@ -217,7 +217,7 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
 })
 router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
-        const userId = req.query.riderId
+        const userId = req.user._id
 
         const checkUser = await pickupDeliverySchema.aggregate([
             {
@@ -292,7 +292,7 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
 })
 router.put('/updateSlots', authenticateToken, checkUserRole(["rider"]), [body('rideId', 'please enter valid ridd Id').custom((value) => mongoose.Types.ObjectId.isValid(value)), body('status', 'please pass valid status code').isNumeric().isIn([2, 3, 4])], checkErr, async (req, res, next) => {
     try {
-        const userId = req.query.riderId
+        const userId = req.user._id
         const { rideId, status } = req.body
         const checkUser = await pickupDeliverySchema.findById(rideId)
         if (checkUser == undefined || checkUser == null) {
