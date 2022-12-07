@@ -1278,7 +1278,7 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                             }
                         }
                     ],
-                    as: "ordermItems"
+                    as: "orderItems"
                 }
             },
             {

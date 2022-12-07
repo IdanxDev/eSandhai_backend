@@ -4274,11 +4274,11 @@ router.put('/updateOrder', authenticateToken, checkUserRole(['superAdmin', 'admi
                 await addPickup.save();
                 // let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: status, riderId: riderId }, { new: true });
             }
-            if (status == 7 && riderId != undefined && [7, 9].includes(checkOrder.status)) {
+            if (status == 8 && riderId != undefined && [7, 9].includes(checkOrder.status)) {
                 let addPickup = new pickupDeliverySchema({
                     orderId: orderId,
                     riderId: riderId,
-                    riderId: "R" + riderId.substring(riderId.length - 4, riderId.length) + makeid(8),
+                    rideId: "R" + riderId.substring(riderId.length - 4, riderId.length) + makeid(8),
                     rideType: 1
                 })
                 await addPickup.save();
@@ -4677,7 +4677,7 @@ router.post('/getUserOrders', authenticateToken, checkUserRole(['superAdmin', 'a
                         //     }
                         // }
                     ],
-                    as: "ordermItems"
+                    as: "orderItems"
                 }
             },
             {
