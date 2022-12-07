@@ -491,17 +491,40 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
             },
             {
                 $lookup: {
-                    from: "daywise",
+                    from: "coupons",
+                    let: { couponId: "$couponId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$couponId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "couponData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "daywises",
                     let: { deliveryId: "$deliveryTimeId", pickupId: "$pickupTimeId" },
-                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$deliveryId"] } } }],
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$deliveryId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
                     as: "deliveryTime"
                 }
             },
             {
                 $lookup: {
-                    from: "daywise",
+                    from: "daywises",
                     let: { pickupId: "$pickupTimeId" },
-                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$pickupId"] } } }],
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$pickupId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
                     as: "pickupTime"
                 }
             },
@@ -509,47 +532,40 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                 $lookup: {
                     from: "users",
                     let: { userId: "$userId" },
-                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }],
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
                     as: "userData"
                 }
             },
             {
                 $lookup: {
-                    from: "pickupdeliveries",
-                    let: { orderId: "$_id" },
-                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$orderId", "$$orderId"] }, { $eq: ["$rideType", 0] }] } } }, { $addFields: { id: "$_id" } }, {
-                        $project: {
-                            _id: 0,
-                            __v: 0
-                        }
-                    }],
-                    as: "pickupSlot"
-                }
-            },
-            {
-                $lookup: {
-                    from: "pickupdeliveries",
-                    let: { orderId: "$_id" },
-                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$orderId", "$$orderId"] }, { $eq: ["$rideType", 1] }] } } }, { $addFields: { id: "$_id" } }, {
-                        $project: {
-                            _id: 0,
-                            __v: 0
-                        }
-                    }],
-                    as: "deliverySlot"
-                }
-            },
-            {
-                $lookup: {
                     from: "addresses",
-                    let: { addressId: "$addressId" },
+                    let: { addressId: "$pickupAddressId" },
                     pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
                         $project: {
                             _id: 0,
                             __v: 0
                         }
                     }],
-                    as: "addressData"
+                    as: "pickupAddressData"
+                }
+            },
+
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: { addressId: "$deliveryAddressId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "deliveryAddressData"
                 }
             },
             {
