@@ -40,6 +40,7 @@ const bannerSchema = require('../models/bannerSchema');
 const dayWiseSchema = require('../models/dayWiseSchema');
 const taxSchema = require('../models/taxSchema');
 const pickupDeliverySchema = require('../models/pickupDeliverySchema');
+const orderSchema = require('../models/orderSchema');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 router.post('/signUp', authenticateToken, checkUserRole(['superAdmin', 'admin']), [body('email').isEmail().withMessage("please pass email id"),
 body('name').isString().withMessage("please pass name"),
@@ -2264,10 +2265,11 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body('end', "please provide ending hours").notEmpty().isString(),
     body('discount', "please provide discount value").notEmpty().isNumeric(),
     body('isOnce', "please provide valid isOnce").optional().isBoolean(),
+    body('percentage', "please provide valid percentage").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            let { name, description, start, discount, end, isOnce, isVisible, terms } = req.body;
+            let { name, description, start, discount, end, isOnce, percentage, isVisible, terms } = req.body;
 
             let checkCategory = await couponSchema.findOne({ name: name });
 
@@ -2285,6 +2287,7 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 description: description,
                 start: startIs,
                 end: endIs,
+                percentage: percentage,
                 discount: discount,
                 isVisible: isVisible,
                 terms: terms
@@ -2308,12 +2311,13 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body("start", "please provide start hours").optional().notEmpty().isString(),
     body('end', "please provide ending hours").optional().notEmpty().isString(),
     body('isOnce', "please provide valid isOnce").optional().isBoolean(),
+    body('percentage', "please provide valid percentage").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     body('couponId', "please pass valid coupon id").custom((value) => mongoose.Types.ObjectId.isValid(value))
     ], checkErr, checkErr, async (req, res) => {
         try {
             const { name,
-                description, terms, discount, start, end, isOnce, isVisible, couponId } = req.body;
+                description, terms, discount, start, end, isOnce, isVisible, percentage, couponId } = req.body;
 
             let checkCategory = await couponSchema.findById(couponId);
             if (checkCategory == undefined || checkCategory == null) {
@@ -2332,6 +2336,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 description: description,
                 terms: terms,
                 isOnce: isOnce,
+                percentage: percentage,
                 start: startIs,
                 discount: discount,
                 end: endIs,
@@ -2362,6 +2367,9 @@ router.get('/getCoupons', authenticateToken, async (req, res) => {
         }
         if ('isActive' in req.query) {
             anotherMatch.push({ isActive: req.query.isActive === 'true' })
+        }
+        if ('isOnce' in req.query) {
+            anotherMatch.push({ isOnce: req.query.isOnce === 'true' })
         }
         if ('date' in req.query) {
             let dateIs = moment(req.query.date + " 00:00:00", "DD-MM-YYYY hh:mm:ss")
@@ -4265,42 +4273,74 @@ router.put('/updateOrder', authenticateToken, checkUserRole(['superAdmin', 'admi
                     return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
                 }
             }
-            if (status == 3 && riderId != undefined && [2, 4].includes(checkOrder.status)) {
-                let addPickup = new pickupDeliverySchema({
-                    orderId: orderId,
+            if (status == 2 && (paymentId == null || paymentId == undefined)) {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'please pass payment id to confirm order' });
+            }
+            if (status == 3 && riderId != undefined) {
+                if ([2, 4].includes(checkOrder.status)) {
+                    let addPickup = new pickupDeliverySchema({
+                        orderId: orderId,
+                        riderId: riderId,
+                        pickupTimeId: checkOrder.pickupTimeId,
+                        deliveryTimeId: checkOrder.deliveryTimeId,
+                        rideId: "R" + riderId.substring(riderId.length - 4, riderId.length) + makeid(8)
+                    })
+                    await addPickup.save();
+                    let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: status, riderId: riderId }, { new: true });
+                    updateOrder._doc['id'] = updateOrder._doc['_id'];
+                    delete updateOrder._doc.updatedAt;
+                    delete updateOrder._doc.createdAt;
+                    delete updateOrder._doc._id;
+                    delete updateOrder._doc.__v;
+                    return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order details updated' });
+                }
+                else {
+                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order status is not delivery failed or delivery pending' });
+                }
+            }
+            if (status == 8 && riderId != undefined) {
+                if ([7, 9].includes(checkOrder.status)) {
+                    let addPickup = new pickupDeliverySchema({
+                        orderId: orderId,
+                        riderId: riderId,
+                        pickupTimeId: checkOrder.pickupTimeId,
+                        deliveryTimeId: checkOrder.deliveryTimeId,
+                        rideId: "R" + riderId.substring(riderId.length - 4, riderId.length) + makeid(8),
+                        rideType: 1
+                    })
+                    await addPickup.save();
+                    let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: status, riderId: riderId }, { new: true });
+                    updateOrder._doc['id'] = updateOrder._doc['_id'];
+                    delete updateOrder._doc.updatedAt;
+                    delete updateOrder._doc.createdAt;
+                    delete updateOrder._doc._id;
+                    delete updateOrder._doc.__v;
+                    return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order details updated' });
+                }
+                else {
+                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order status is not delivery failed or delivery pending' });
+                }
+            }
+            if ([0, 1, 2, 4, 5, 6, 7, 9, 10].includes(status)) {
+                let update = {
+                    status: status,
+                    deliveryInstruction: deliveryInstruction,
+                    pickupInstruction: pickupInstruction,
+                    pickupAddressId: pickupAddressId,
+                    deliveryAddressId: deliveryAddressId,
                     riderId: riderId,
-                    rideId: "R" + riderId.substring(riderId.length - 4, riderId.length) + makeid(8)
-                })
-                await addPickup.save();
-                // let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: status, riderId: riderId }, { new: true });
+                    paymentId: paymentId,
+                    note: note
+                }
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, update, { new: true });
+                updateOrder._doc['id'] = updateOrder._doc['_id'];
+                delete updateOrder._doc.updatedAt;
+                delete updateOrder._doc.createdAt;
+                delete updateOrder._doc._id;
+                delete updateOrder._doc.__v;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
             }
-            if (status == 8 && riderId != undefined && [7, 9].includes(checkOrder.status)) {
-                let addPickup = new pickupDeliverySchema({
-                    orderId: orderId,
-                    riderId: riderId,
-                    rideId: "R" + riderId.substring(riderId.length - 4, riderId.length) + makeid(8),
-                    rideType: 1
-                })
-                await addPickup.save();
-                // let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: status, riderId: riderId }, { new: true });
-            }
-            let update = {
-                status: status,
-                deliveryInstruction: deliveryInstruction,
-                pickupInstruction: pickupInstruction,
-                pickupAddressId: pickupAddressId,
-                deliveryAddressId: deliveryAddressId,
-                riderId: riderId,
-                paymentId: paymentId,
-                note: note
-            }
-            let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, update, { new: true });
-            updateOrder._doc['id'] = updateOrder._doc['_id'];
-            delete updateOrder._doc.updatedAt;
-            delete updateOrder._doc.createdAt;
-            delete updateOrder._doc._id;
-            delete updateOrder._doc.__v;
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'please pass valid status code' });
 
         }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });

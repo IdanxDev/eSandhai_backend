@@ -16,6 +16,7 @@ const invoiceSchema = require('../../models/invoiceSchema');
 const orderItems = require('../../models/orderItems');
 const itemSchema = require('../../models/itemSchema');
 const dayWiseSchema = require('../../models/dayWiseSchema');
+const couponSchema = require('../../models/couponSchema');
 router.post('/addOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupTimeId, deliveryTimeId, pickupInstruction, deliveryInstruction, pickupAddressId, deliveryAddressId, items } = req.body;
@@ -43,7 +44,7 @@ router.post('/addOrder', authenticateToken, async (req, res, next) => {
         }
         console.log(totalAmount);
         //check for 15$ validation
-
+        // console.log(checkSubscription);
         let taxes = await taxSchema.findOne({ isSubscription: checkSubscription[0].isSubscription, isMember: checkSubscription[0].isMember })
         console.log(taxes);
         if (taxes != undefined && taxes != null) {
@@ -95,6 +96,92 @@ router.post('/addOrder', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+// router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
+//     try {
+//         const { qty, itemId, categoryId, orderId } = req.body;
+//         const userId = req.user._id;
+//         let taxApplied = {}
+//         let getOrder = await invoiceSchema.findById(orderId);
+//         if (getOrder == undefined || getOrder == null) {
+//             return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order details not found' });
+//         }
+//         let checkSubscription = await checkUserSubscriptionMember(userId);
+//         let taxes = await taxSchema.findOne({ isSubscription: true, isMember: checkSubscription[0].isMember })
+//         let payableAmount = 0;
+//         // console.log(taxes);
+//         if (taxes != undefined && taxes != null) {
+//             taxApplied = taxes.taxes;
+//             payableAmount = parseFloat((Object.values(taxApplied)).reduce((a, b) => a + b, 0))
+//             // if (JSON.stringify(getOrder.taxes) != JSON.stringify(taxApplied)) {
+//             //     let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+//             // }
+//         }
+//         else {
+//             if (JSON.stringify(getOrder.taxes) != JSON.stringify({})) {
+//                 taxApplied = {};
+//                 payableAmount = parseFloat(getOrder.orderAmount) + parseFloat(0)
+//                 // let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+//             }
+//         }
+//         let getItem = await itemSchema.findById(itemId);
+//         if (getItem == undefined || getItem == null) {
+//             return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'item not found' });
+//         }
+//         const amount = getItem.price;
+//         let finalAmount = qty * amount;
+//         let checkItems = await orderItems.findOne({ itemId: mongoose.Types.ObjectId(itemId), orderId: mongoose.Types.ObjectId(orderId) });
+//         if (checkItems != null && checkItems != undefined) {
+//             let updateQty;
+//             console.log("qty");
+//             console.log(checkItems.qty);
+//             let finalQty = checkItems.qty + qty;
+//             console.log(finalQty);
+//             if (finalQty <= 0) {
+//                 updateQty = await orderItems.findByIdAndRemove(checkItems._id)
+//                 updateQty._doc['qty'] = 0
+//                 updateQty._doc['amount'] = 0
+//             }
+//             else {
+//                 updateQty = await orderItems.findByIdAndUpdate(checkItems._id, {
+//                     $inc: {
+//                         qty: qty, amount: finalAmount
+//                     }
+//                 }, { new: true })
+//             }
+//             console.log(finalAmount);
+//             let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, {
+//                 $inc: {
+//                     orderAmount: finalAmount, finalAmount: finalAmount,
+//                     pendingAmount: finalAmount
+//                 }
+//             }, { new: true });
+//             updateQty._doc['id'] = updateQty._doc['_id'];
+//             delete updateQty._doc.updatedAt;
+//             delete updateQty._doc.createdAt;
+//             delete updateQty._doc._id;
+//             delete updateQty._doc.__v;
+//             return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateQty }, message: 'order items updated' });
+//         }
+//         let addItem = new orderItems({
+//             qty: qty,
+//             amount: amount,
+//             itemId: itemId,
+//             categoryId: categoryId,
+//             orderId: orderId
+//         })
+//         await addItem.save();
+//         let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount } }, { new: true });
+//         addItem._doc['id'] = addItem._doc['_id'];
+//         delete addItem._doc.updatedAt;
+//         delete addItem._doc.createdAt;
+//         delete addItem._doc._id;
+//         delete addItem._doc.__v;
+//         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addItem }, message: 'order item added' });
+//     }
+//     catch (error) {
+//         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+//     }
+// })
 router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
     try {
         const { qty, itemId, categoryId, orderId } = req.body;
@@ -105,7 +192,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order details not found' });
         }
         let checkSubscription = await checkUserSubscriptionMember(userId);
-        let taxes = await taxSchema.findOne({ isSubscription: true, isMember: checkSubscription[0].isMember })
+        let taxes = await taxSchema.findOne({ isSubscription: checkSubscription[0].isSubscription, isMember: checkSubscription[0].isMember })
         // console.log(taxes);
         if (taxes != undefined && taxes != null) {
             taxApplied = taxes.taxes;
@@ -183,10 +270,39 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
 router.put('/updateOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note, couponId } = req.body;
+        const userId = req.user._id;
         let checkOrder = await invoiceSchema.findById(orderId);
         let checkSubscription = await checkUserSubscriptionMember(userId);
 
         if (checkOrder != undefined && checkOrder != null) {
+            if (checkOrder.status == 1 && (couponId != undefined && couponId != null)) {
+                console.log("here");
+                let checkCoupon = await couponSchema.findById(couponId);
+                let amount = checkOrder.finalAmount;
+                if (checkCoupon != undefined && checkCoupon != null) {
+                    if (checkCoupon.isOnce == true) {
+                        let checkCoupon = await invoiceSchema.findOne({ userId: mongoose.Types.ObjectId(checkOrder.userId), couponId: mongoose.Types.ObjectId(couponId), status: { $nin: [11, 0] } });
+                        if (checkCoupon != undefined && checkCoupon == null) {
+                            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon already used once' });
+                        }
+                    }
+                    if ('percentage' in checkCoupon && checkCoupon.percentage == true) {
+                        amount = amount - ((checkCoupon.discount / 100) * amount)
+                    }
+                    else {
+                        amount = amount - checkCoupon.discount;
+                    }
+                }
+                console.log(amount);
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { couponId: couponId, orderTotalAmount: amount, pendingAmount: amount }, { new: true });
+                updateOrder._doc['id'] = updateOrder._doc['_id'];
+                delete updateOrder._doc.updatedAt;
+                delete updateOrder._doc.createdAt;
+                delete updateOrder._doc._id;
+                delete updateOrder._doc.__v;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+
+            }
             if (status == 1) {
                 if (checkSubscription != undefined && 'isSubscription' in checkSubscription && 'isMember' in checkSubscription && checkSubscription.isSubscription == false && checkSubscription.isMember == false && totalAmount < 15) {
                     return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });

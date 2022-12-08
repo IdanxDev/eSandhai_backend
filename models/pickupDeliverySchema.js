@@ -9,6 +9,14 @@ const pickupDeliverySchema = mongoose.Schema({
         type: String,
         default: ""
     },
+    pickupTimeId: {
+        type: mongoose.Types.ObjectId,
+        ref: "daywises"
+    },
+    deliveryTimeId: {
+        type: mongoose.Types.ObjectId,
+        ref: "daywises"
+    },
     startCordinates: [{
         type: Number
     }],
@@ -38,6 +46,10 @@ const pickupDeliverySchema = mongoose.Schema({
         type: Number,
         default: 0,
         enum: [0, 1, 2, 3, 4]
+    },
+    description: {
+        type: String,
+        default: ""
     },
     orderId: {
         type: mongoose.Types.ObjectId,

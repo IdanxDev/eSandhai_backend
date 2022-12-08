@@ -217,52 +217,119 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
 })
 router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
-        const userId = req.user._id
-        const { isToday } = req.query;
-        let match;
-        if (isToday != undefined) {
-            match = {
-                $and: [
-                    { riderId: mongoose.Types.ObjectId(userId) },
-                    { isToday: isToday }
-                ]
-            }
-        }
-        else {
-            match = {
-                riderId: mongoose.Types.ObjectId(userId)
-            }
-        }
+        const userId = req.user._id;
         const checkUser = await pickupDeliverySchema.aggregate([
             {
-                $match: match
+                $match: {
+                    $and: [
+                        {
+                            riderId: mongoose.Types.ObjectId(userId)
+                        },
+                        {
+                            status: { $in: [2, 3, 4] }
+                        }
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: "daywises",
+                    let: { orderId: "$pickupTimeId", rideType: "$rideType" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "pickupTimeData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "daywises",
+                    let: { orderId: "$deliveryTimeId" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "deliveryTimeData"
+                }
+            },
+            {
+                $addFields: {
+                    isSameDay: { $cond: [{ $eq: [{ $first: "$pickupTimeData.date" }, { $first: "$deliveryTimeData.date" }] }, true, false] },
+                    timeData: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$rideType", 0] }, then: { $first: "$pickupTimeData" } },
+                                { case: { $eq: ["$rideType", 1] }, then: { $first: "$deliveryTimeData" } },
+                                { case: { $eq: ["$rideType", 2] }, then: "Return" }
+                            ],
+                            default: "Did not match"
+                        }
+                    }
+                }
             },
             {
                 $lookup: {
                     from: "invoices",
                     let: { orderId: "$orderId" },
                     pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } },
-
                     {
                         $lookup: {
-                            from: "daywises",
-                            let: { orderId: "$pickupTimeId" },
-                            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }],
-                            as: "pickupTimeData"
+                            from: "addresses",
+                            let: { orderId: "$pickupAddressId" },
+                            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                                $addFields: {
+                                    id: "$_id"
+                                }
+                            }, {
+                                $project: {
+                                    _id: 0,
+                                    __v: 0
+                                }
+                            }],
+                            as: "pickupAddressData"
                         }
                     },
-
                     {
                         $lookup: {
-                            from: "daywises",
-                            let: { orderId: "$deliveryTimeId" },
-                            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }],
-                            as: "deliveryTimeData"
+                            from: "addresses",
+                            let: {
+                                orderId: "$deliveryAddressId"
+                            },
+                            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                                $addFields: {
+                                    id: "$_id"
+                                }
+                            }, {
+                                $project: {
+                                    _id: 0,
+                                    __v: 0
+                                }
+                            }],
+                            as: "deliveryAddressData"
                         }
-                    },
-                    {
+                    }, {
                         $addFields: {
-                            isSameDay: { $cond: [{ $eq: [{ $first: "$pickupTimeData.date" }, { $first: "$deliveryTimeData.date" }] }, true, false] }
+                            id: "$_id",
+                            pickupAddress: { $first: "$pickupAddressData" },
+                            deliveryAddress: { $first: "$deliveryAddressData" }
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
                         }
                     }
                     ],
@@ -272,12 +339,22 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
             {
                 $addFields: {
                     "id": "$_id",
-                    rideType: {
+                    rideTypeValue: {
                         $switch: {
                             branches: [
                                 { case: { $eq: ["$rideType", 0] }, then: "Pickup" },
-                                { case: { $gt: ["$rideType", 1] }, then: "Delivery" },
-                                { case: { $gt: ["$rideType", 2] }, then: "Return" }
+                                { case: { $eq: ["$rideType", 1] }, then: "Delivery" },
+                                { case: { $eq: ["$rideType", 2] }, then: "Return" }
+                            ],
+                            default: "Did not match"
+                        }
+                    },
+                    addressData: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$rideType", 0] }, then: { $first: "$orderData.pickupAddress" } },
+                                { case: { $eq: ["$rideType", 1] }, then: { $first: "$orderData.deliveryAddress" } },
+                                { case: { $eq: ["$rideType", 2] }, then: "Return" }
                             ],
                             default: "Did not match"
                         }
@@ -285,7 +362,16 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
                 }
             },
             {
+                $sort: { updatedAt: -1 }
+            },
+            {
                 $project: {
+                    pickupTimeData: 0,
+                    deliveryTimeData: 0,
+                    "orderData.pickupAddressData": 0,
+                    "orderData.deliveryAddressData": 0,
+                    "orderData.pickupAddress": 0,
+                    "orderData.deliveryAddress": 0,
                     "createdAt": 0,
                     "updatedAt": 0,
                     "_id": 0,
@@ -295,17 +381,220 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
             }
         ]);
         if (checkUser.length == 0) {
-            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no any order assigned" });
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no any order assigned" });
         }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser }, message: "order found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getTodayOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        // let currentDate = moment()
+        //     .tz('America/Panama').format("DD/MM/YYYY")
+        let currentDate = "01/12/2022"
+        console.log(currentDate);
+        const checkUser = await pickupDeliverySchema.aggregate([
+            {
+                $match: {
+                    $and: [{
+                        riderId: mongoose.Types.ObjectId(userId)
+                    }, {
+                        status: { $in: [0, 1] }
+                    }]
+                }
+            },
+            {
+                $lookup: {
+                    from: "daywises",
+                    let: { orderId: "$pickupTimeId", rideType: "$rideType" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "pickupTimeData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "daywises",
+                    let: { orderId: "$deliveryTimeId" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "deliveryTimeData"
+                }
+            },
+            {
+                $addFields: {
+                    isSameDay: { $cond: [{ $eq: [{ $first: "$pickupTimeData.date" }, { $first: "$deliveryTimeData.date" }] }, true, false] },
+                    timeData: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$rideType", 0] }, then: { $first: "$pickupTimeData" } },
+                                { case: { $eq: ["$rideType", 1] }, then: { $first: "$deliveryTimeData" } },
+                                { case: { $eq: ["$rideType", 2] }, then: "Return" }
+                            ],
+                            default: "Did not match"
+                        }
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: "invoices",
+                    let: { orderId: "$orderId" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } },
+                    {
+                        $lookup: {
+                            from: "addresses",
+                            let: { orderId: "$pickupAddressId" },
+                            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                                $addFields: {
+                                    id: "$_id"
+                                }
+                            }, {
+                                $project: {
+                                    _id: 0,
+                                    __v: 0
+                                }
+                            }],
+                            as: "pickupAddressData"
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: "addresses",
+                            let: {
+                                orderId: "$deliveryAddressId"
+                            },
+                            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                                $addFields: {
+                                    id: "$_id"
+                                }
+                            }, {
+                                $project: {
+                                    _id: 0,
+                                    __v: 0
+                                }
+                            }],
+                            as: "deliveryAddressData"
+                        }
+                    }, {
+                        $addFields: {
+                            id: "$_id",
+                            pickupAddress: { $first: "$pickupAddressData" },
+                            deliveryAddress: { $first: "$deliveryAddressData" }
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }
+                    ],
+                    as: "orderData"
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id",
+                    rideTypeValue: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$rideType", 0] }, then: "Pickup" },
+                                { case: { $eq: ["$rideType", 1] }, then: "Delivery" },
+                                { case: { $eq: ["$rideType", 2] }, then: "Return" }
+                            ],
+                            default: "Did not match"
+                        }
+                    },
+                    addressData: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$rideType", 0] }, then: { $first: "$orderData.pickupAddress" } },
+                                { case: { $eq: ["$rideType", 1] }, then: { $first: "$orderData.deliveryAddress" } },
+                                { case: { $eq: ["$rideType", 2] }, then: "Return" }
+                            ],
+                            default: "Did not match"
+                        }
+                    }
+                }
+            },
+            {
+                $match: {
+                    $expr: {
+                        $eq: ["$timeData.date", currentDate]
+                    }
+                }
+            },
+            {
+                $sort: { updatedAt: -1 }
+            },
+            {
+                $project: {
+                    pickupTimeData: 0,
+                    deliveryTimeData: 0,
+                    "orderData.pickupAddressData": 0,
+                    "orderData.deliveryAddressData": 0,
+                    "orderData.pickupAddress": 0,
+                    "orderData.deliveryAddress": 0,
+                    "createdAt": 0,
+                    "updatedAt": 0,
+                    "_id": 0,
+                    "__v": 0,
+                    "otp": 0
+                }
+            }
+        ]);
+        if (checkUser.length == 0) {
+            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no any order assigned" });
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser }, message: "order found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/updateOrder', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
+    try {
+        const { rideId, status, description } = req.body;
+
+        let checkOrder = await pickupDeliverySchema.findById(rideId);
+
+        if (checkOrder != undefined && checkOrder != null) {
+            let updateOrder = await pickupDeliverySchema.findByIdAndUpdate(rideId, { status: status, description: description }, { new: true });
+            updateOrder._doc['id'] = updateOrder._doc['_id'];
+            delete updateOrder._doc.updatedAt;
+            delete updateOrder._doc.createdAt;
+            delete updateOrder._doc._id;
+            delete updateOrder._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'ride details updated' });
+
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
+    }
+    catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.put('/updateSlots', authenticateToken, checkUserRole(["rider"]), [body('rideId', 'please enter valid ridd Id').custom((value) => mongoose.Types.ObjectId.isValid(value)), body('status', 'please pass valid status code').isNumeric().isIn([2, 3, 4])], checkErr, async (req, res, next) => {
     try {
         const userId = req.user._id
-        const { rideId, status } = req.body
+        const { rideId, status, description } = req.body
         const checkUser = await pickupDeliverySchema.findById(rideId)
         if (checkUser == undefined || checkUser == null) {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no any order assigned" });
@@ -319,8 +608,13 @@ router.put('/updateSlots', authenticateToken, checkUserRole(["rider"]), [body('r
         else if (status == 4) {
             let updateInvoice = await invoiceSchema.findByIdAndUpdate(checkUser.orderId, { status: 4 }, { new: true });
         }
-        let updateRide = await pickupDeliverySchema.findByIdAndUpdate(rideId, { status: status }, { new: true });
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser }, message: "order updated" });
+        let updateRide = await pickupDeliverySchema.findByIdAndUpdate(rideId, { status: status, description: description }, { new: true });
+        updateRide._doc['id'] = updateRide._doc['_id'];
+        delete updateRide._doc.updatedAt;
+        delete updateRide._doc.createdAt;
+        delete updateRide._doc._id;
+        delete updateRide._doc.__v;
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateRide }, message: "order updated" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

@@ -2568,7 +2568,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order details not found' });
         }
         let checkSubscription = await checkUserSubscriptionMember(userId);
-        let taxes = await taxSchema.findOne({ isSubscription: true, isMember: checkSubscription[0].isMember })
+        let taxes = await taxSchema.findOne({ isSubscription: checkSubscription[0].isSubscription, isMember: checkSubscription[0].isMember })
         // console.log(taxes);
         if (taxes != undefined && taxes != null) {
             taxApplied = taxes.taxes;

@@ -22,6 +22,10 @@ const couponSchema = mongoose.Schema({
         type: Boolean,
         default: true
     },
+    percentage: {
+        type: Boolean,
+        default: true
+    },
     isVisible: {
         type: Boolean,
         default: true
