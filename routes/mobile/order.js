@@ -60,7 +60,7 @@ router.post('/addOrder', authenticateToken, async (req, res, next) => {
         let addOrder = new invoiceSchema({
             pickupTimeId: pickupTimeId,
             deliveryTimeId: deliveryTimeId,
-            status: 0,
+            status: 1,
             userId: userId,
             deliveryInstruction: deliveryInstruction,
             pickupInstruction: pickupInstruction,
@@ -759,8 +759,8 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                     amount: "$orderAmount",
                     name: { $first: "$userData.name" },
                     addressData: { $first: "$addressData" },
-                    deliveryTime: { $first: "$deliverySlot" },
-                    pickupTime: { $first: "$pickupSlot" }
+                    deliveryTime: { $first: "$deliveryTime" },
+                    pickupTime: { $first: "$pickupTime" }
                 }
             },
             {
