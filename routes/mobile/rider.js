@@ -218,12 +218,24 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
 router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
         const userId = req.user._id
-
+        const { isToday } = req.query;
+        let match;
+        if (isToday != undefined) {
+            match = {
+                $and: [
+                    { riderId: mongoose.Types.ObjectId(userId) },
+                    { isToday: isToday }
+                ]
+            }
+        }
+        else {
+            match = {
+                riderId: mongoose.Types.ObjectId(userId)
+            }
+        }
         const checkUser = await pickupDeliverySchema.aggregate([
             {
-                $match: {
-                    riderId: mongoose.Types.ObjectId(userId)
-                }
+                $match: match
             },
             {
                 $lookup: {
