@@ -182,7 +182,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
 })
 router.put('/updateOrder', authenticateToken, async (req, res, next) => {
     try {
-        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note } = req.body;
+        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, note, couponId } = req.body;
         let checkOrder = await invoiceSchema.findById(orderId);
         let checkSubscription = await checkUserSubscriptionMember(userId);
 
@@ -566,6 +566,13 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                         }
                     }],
                     as: "deliveryAddressData"
+                }
+            },
+            {
+                $addFields: {
+
+                    pickupAddressData: { $first: "$pickupAddressData" },
+                    deliveryAddressData: { $first: "$deliveryAddressData" }
                 }
             },
             {

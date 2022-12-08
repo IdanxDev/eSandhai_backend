@@ -1248,6 +1248,13 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                 }
             },
             {
+                $addFields: {
+
+                    pickupAddressData: { $first: "$pickupAddressData" },
+                    deliveryAddressData: { $first: "$deliveryAddressData" }
+                }
+            },
+            {
                 $lookup: {
                     from: "orderitems",
                     let: { id: "$_id" },

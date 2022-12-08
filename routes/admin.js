@@ -4663,6 +4663,13 @@ router.post('/getUserOrders', authenticateToken, checkUserRole(['superAdmin', 'a
                 }
             },
             {
+                $addFields: {
+
+                    pickupAddressData: { $first: "$pickupAddressData" },
+                    deliveryAddressData: { $first: "$deliveryAddressData" }
+                }
+            },
+            {
                 $lookup: {
                     from: "orderitems",
                     let: { id: "$_id" },
