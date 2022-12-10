@@ -670,7 +670,6 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                     as: "pickupAddressData"
                 }
             },
-
             {
                 $lookup: {
                     from: "addresses",

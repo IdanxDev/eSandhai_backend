@@ -34,6 +34,10 @@ const couponSchema = mongoose.Schema({
         type: Boolean,
         default: false
     },
+    minimumAmount: {
+        type: Number,
+        default: 0
+    },
     terms: {
         type: String,
         default: ""

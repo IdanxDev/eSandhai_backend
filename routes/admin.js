@@ -1076,6 +1076,63 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
             {
                 $lookup: {
                     from: "addresses",
+                    let: { orderId: "$pickupAddressId" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "pickupAddressData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: {
+                        orderId: "$deliveryAddressId"
+                    },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$_id", "$$orderId"] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "deliveryAddressData"
+                }
+            },
+            ,
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: {
+                        orderId: "$_id"
+                    },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$orderId", "$$orderId"] }, { $eq: ["$status", 0] }] } } }, {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "rideData"
+                }
+            },
+
+            {
+                $lookup: {
+                    from: "addresses",
                     let: { addressId: "$addressId" },
                     pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
                         $project: {
@@ -1131,6 +1188,8 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
             },
             {
                 $addFields: {
+                    rideId: { $first: "$rideData.rideId" },
+                    rideStatus: { $first: "$rideData.status" },
                     invoiceId: "$orderId",
                     paymentStatus: { $cond: { if: { $and: [{ $isArray: "$paymentId" }, { $gte: [{ $size: "$paymentId" }, 1] }] }, then: 1, else: 0 } },
                     invoiceStatus: "$status",
@@ -1163,6 +1222,8 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
                     otp: 0,
                     generatedTime: 0,
                     userData: 0,
+                    rideData: 0,
+
                     createdAtDate: 0,
                     updatedAtDate: 0,
                     createdAtTime: 0,
@@ -2264,12 +2325,13 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body("start", "please provide start hours").notEmpty().isString(),
     body('end', "please provide ending hours").notEmpty().isString(),
     body('discount', "please provide discount value").notEmpty().isNumeric(),
+    body('minimumAmount', "please provide minimum amount").notEmpty().isNumeric(),
     body('isOnce', "please provide valid isOnce").optional().isBoolean(),
     body('percentage', "please provide valid percentage").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            let { name, description, start, discount, end, isOnce, percentage, isVisible, terms } = req.body;
+            let { name, description, start, discount, end, isOnce, percentage, minimumAmount, isVisible, terms } = req.body;
 
             let checkCategory = await couponSchema.findOne({ name: name });
 
@@ -2287,6 +2349,7 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 description: description,
                 start: startIs,
                 end: endIs,
+                minimumAmount: minimumAmount,
                 percentage: percentage,
                 discount: discount,
                 isVisible: isVisible,
@@ -2311,13 +2374,14 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body("start", "please provide start hours").optional().notEmpty().isString(),
     body('end', "please provide ending hours").optional().notEmpty().isString(),
     body('isOnce', "please provide valid isOnce").optional().isBoolean(),
+    body('minimumAmount', "please provide minimum amount").notEmpty().isNumeric(),
     body('percentage', "please provide valid percentage").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     body('couponId', "please pass valid coupon id").custom((value) => mongoose.Types.ObjectId.isValid(value))
     ], checkErr, checkErr, async (req, res) => {
         try {
             const { name,
-                description, terms, discount, start, end, isOnce, isVisible, percentage, couponId } = req.body;
+                description, terms, discount, start, end, isOnce, isVisible, minimumAmount, percentage, couponId } = req.body;
 
             let checkCategory = await couponSchema.findById(couponId);
             if (checkCategory == undefined || checkCategory == null) {
@@ -2336,6 +2400,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 description: description,
                 terms: terms,
                 isOnce: isOnce,
+                minimumAmount: minimumAmount,
                 percentage: percentage,
                 start: startIs,
                 discount: discount,
@@ -4704,9 +4769,153 @@ router.post('/getUserOrders', authenticateToken, checkUserRole(['superAdmin', 'a
             },
             {
                 $addFields: {
-
+                    isSameDay: { $cond: [{ $eq: [{ $first: "$pickupTime.date" }, { $first: "$deliveryTime.date" }] }, true, false] },
                     pickupAddressData: { $first: "$pickupAddressData" },
                     deliveryAddressData: { $first: "$deliveryAddressData" }
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { id: "$_id", "sameDay": "$isSameDay" },
+                    pipeline: [
+                        { $match: { $expr: { $and: [{ $eq: ["$orderId", "$$id"] }, { $eq: ["$rideType", 0] }] } } },
+                        {
+                            $lookup: {
+                                from: "riders",
+                                localField: "riderId",
+                                foreignField: "_id",
+                                as: "riderData"
+                            }
+                        },
+                        {
+                            $addFields: {
+                                sameDayPickup: "$$sameDay",
+                                sameDayDelivery: "$$sameDay",
+                                id: "$_id",
+                                riderName: { $first: "$riderData.name" }
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0, __v: 0
+                            }
+                        }
+                        // {
+                        //     $group: {
+                        //         _id: "$categoryName",
+                        //         items: { $push: "$$ROOT" }
+                        //     }
+                        // },
+                        // {
+                        //     $addFields: {
+                        //         name: "$_id.name",
+                        //         categoryData: "$_id"
+                        //     }
+                        // },
+                        // {
+                        //     $project: {
+                        //         _id: 0
+                        //     }
+                        // }
+                    ],
+                    as: "pickupRide"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { id: "$_id", "sameDay": "$isSameDay" },
+                    pipeline: [
+                        { $match: { $expr: { $and: [{ $eq: ["$orderId", "$$id"] }, { $eq: ["$rideType", 1] }] } } },
+                        {
+                            $lookup: {
+                                from: "riders",
+                                localField: "riderId",
+                                foreignField: "_id",
+                                as: "riderData"
+                            }
+                        },
+                        {
+                            $addFields: {
+                                sameDayPickup: "$$sameDay",
+                                sameDayDelivery: "$$sameDay",
+                                id: "$_id",
+                                riderName: { $first: "$riderData.name" }
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0, __v: 0
+                            }
+                        }
+                        // {
+                        //     $group: {
+                        //         _id: "$categoryName",
+                        //         items: { $push: "$$ROOT" }
+                        //     }
+                        // },
+                        // {
+                        //     $addFields: {
+                        //         name: "$_id.name",
+                        //         categoryData: "$_id"
+                        //     }
+                        // },
+                        // {
+                        //     $project: {
+                        //         _id: 0
+                        //     }
+                        // }
+                    ],
+                    as: "deliveryRide"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { id: "$_id", "sameDay": "$isSameDay" },
+                    pipeline: [
+                        { $match: { $expr: { $and: [{ $eq: ["$orderId", "$$id"] }, { $eq: ["$rideType", 2] }] } } },
+                        {
+                            $lookup: {
+                                from: "riders",
+                                localField: "riderId",
+                                foreignField: "_id",
+                                as: "riderData"
+                            }
+                        },
+                        {
+                            $addFields: {
+                                sameDayPickup: "$$sameDay",
+                                sameDayDelivery: "$$sameDay",
+                                id: "$_id",
+                                riderName: { $first: "$riderData.name" }
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0, __v: 0
+                            }
+                        }
+                        // {
+                        //     $group: {
+                        //         _id: "$categoryName",
+                        //         items: { $push: "$$ROOT" }
+                        //     }
+                        // },
+                        // {
+                        //     $addFields: {
+                        //         name: "$_id.name",
+                        //         categoryData: "$_id"
+                        //     }
+                        // },
+                        // {
+                        //     $project: {
+                        //         _id: 0
+                        //     }
+                        // }
+                    ],
+                    as: "returnRide"
                 }
             },
             {
@@ -4776,6 +4985,28 @@ router.post('/getUserOrders', authenticateToken, checkUserRole(['superAdmin', 'a
                     invoiceStatus: "$status",
                     amount: "$orderAmount",
                     name: { $first: "$userData.name" },
+                    riderData: {
+                        sameDayPickup: "$isSameDay",
+                        sameDayDelivery: "$isSameDay",
+                        pickupAssignedTo: {
+                            riderName: { $ifNull: [{ $first: "$pickupRide.riderName" }, { $first: "$pickupRide.riderName" }, ""] },
+                            riderId: { $ifNull: [{ $first: "$pickupRide.riderId" }, { $first: "$pickupRide.riderId" }, ""] },
+                            rideId: { $ifNull: [{ $first: "$pickupRide.rideId" }, { $first: "$pickupRide.rideId" }, ""] },
+                            rideStatus: { $ifNull: [{ $first: "$pickupRide.status" }, { $first: "$pickupRide.status" }, 0] }
+                        },
+                        deliveryAssignedTo: {
+                            riderName: { $ifNull: [{ $first: "$deliveryRide.riderName" }, { $first: "$deliveryRide.riderName" }, ""] },
+                            riderId: { $ifNull: [{ $first: "$deliveryRide.riderId" }, { $first: "$deliveryRide.riderId" }, ""] },
+                            rideId: { $ifNull: [{ $first: "$deliveryRide.rideId" }, { $first: "$deliveryRide.rideId" }, ""] },
+                            rideStatus: { $ifNull: [{ $first: "$deliveryRide.status" }, { $first: "$deliveryRide.status" }, 0] }
+                        },
+                        returnAssignedTo: {
+                            riderName: { $ifNull: [{ $first: "$returnRide.riderName" }, { $first: "$returnRide.riderName" }, ""] },
+                            riderId: { $ifNull: [{ $first: "$returnRide.riderId" }, { $first: "$returnRide.riderId" }, ""] },
+                            rideId: { $ifNull: [{ $first: "$returnRide.rideId" }, { $first: "$returnRide.rideId" }, ""] },
+                            rideStatus: { $ifNull: [{ $first: "$returnRide.status" }, { $first: "$returnRide.status" }, 0] }
+                        }
+                    }
                     // addressData: { $first: "$addressData" },
                     // deliveryTime: { $first: "$deliveryTime" },
                     // pickupTime: { $first: "$pickupTime" }
@@ -4800,6 +5031,9 @@ router.post('/getUserOrders', authenticateToken, checkUserRole(['superAdmin', 'a
                     __v: 0,
                     _id: 0,
                     password: 0,
+                    deliveryRide: 0,
+                    pickupRide: 0,
+                    returnRide: 0,
                     otp: 0,
                     generatedTime: 0,
                     userData: 0,
