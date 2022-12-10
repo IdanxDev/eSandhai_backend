@@ -1028,6 +1028,7 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
                 _id: mongoose.Types.ObjectId(orderId)
             })
         }
+        console.log(anotherMatch)
         if (anotherMatch.length > 0) {
             match = {
                 $match: {
@@ -1042,6 +1043,7 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
                 }
             }
         }
+        console.log(match);
         let getUsers = await invoiceSchema.aggregate([
             match,
             {
@@ -1109,7 +1111,7 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
                     as: "deliveryAddressData"
                 }
             },
-            ,
+
             {
                 $lookup: {
                     from: "pickupdeliveries",
