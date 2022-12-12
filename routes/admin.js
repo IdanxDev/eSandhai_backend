@@ -901,6 +901,125 @@ router.get('/getAllUsers', authenticateToken, checkUserRole(['superAdmin', 'admi
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getSubscribedUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res) => {
+    try {
+        const { userId } = req.query;
+        let match;
+        let anotherMatch = [];
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
+        if ('role' in req.query) {
+            anotherMatch.push({ role: req.query.role })
+        }
+        if ('status' in req.query) {
+            anotherMatch.push({ status: parseInt(req.query.status) });
+        }
+        if (userId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(userId)
+            })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await userSchema.aggregate([
+            match,
+            {
+                $lookup: {
+                    from: "usersubsciptions",
+                    let: { userId: "$userId" },
+                    pipeline: [{
+                        $match: {
+                            $expr: {
+                                $and: [{ $eq: ["$userId", "$$userId"] }, { $eq: ["$status", 1] }]
+                            }
+                        }
+                    },
+                    {
+                        $addFields: {
+                            id: "$_id"
+                        }
+                    }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "subscriptionData"
+                }
+            },
+            {
+                $match: {
+                    $expr: {
+                        $gte: [{ $size: "$subscriptionData" }, 1]
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0
+                }
+            },
+            {
+                $addFields: {
+                    currentPlan: { $ifNull: ["$currentPlan", "Unspecified"] },
+                    country: "Usa",
+                    mobileNo: { $ifNull: ["$mobileNo", "Unspecified"] },
+                    email: { $ifNull: ["$email", "Unspecified"] },
+                    status: { $ifNull: ["$status", 0] },
+                    name: { $ifNull: ["$name", ""] }
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `users found` : "no user found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.post('/updateOrderItem', authenticateToken, checkUserRole(['superAdmin', 'admin']), async (req, res, next) => {
     try {
         const { amount, itemId, categoryId, orderId } = req.body;
