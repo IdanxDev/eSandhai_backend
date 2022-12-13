@@ -621,6 +621,7 @@ router.get('/getNotifications', authenticateToken, async (req, res, next) => {
                 image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
                 title: "title",
                 description: "description",
+                notificationType: 0,
                 createdAt: "2022-11-09T05:24:26.838Z"
             },
             {
@@ -628,6 +629,7 @@ router.get('/getNotifications', authenticateToken, async (req, res, next) => {
                 image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
                 title: "title",
                 description: "description",
+                notificationType: 1,
                 createdAt: "2022-11-09T05:24:26.838Z"
             },
             {
@@ -635,6 +637,7 @@ router.get('/getNotifications', authenticateToken, async (req, res, next) => {
                 image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
                 title: "title",
                 description: "description",
+                notificationType: 0,
                 createdAt: "2022-11-09T05:24:26.838Z"
             },
             {
@@ -642,6 +645,7 @@ router.get('/getNotifications', authenticateToken, async (req, res, next) => {
                 image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
                 title: "title",
                 description: "description",
+                notificationType: 1,
                 createdAt: "2022-11-09T05:24:26.838Z"
             },
             {
@@ -649,6 +653,7 @@ router.get('/getNotifications', authenticateToken, async (req, res, next) => {
                 image: "https://delux-cleaner.s3.ap-south-1.amazonaws.com/icons/1670298132352zOeefXosOy.png",
                 title: "title",
                 description: "description",
+                notificationType: 0,
                 createdAt: "2022-11-09T05:24:26.838Z"
             }
         ]
