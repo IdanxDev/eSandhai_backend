@@ -23,6 +23,7 @@ const vehicleSchema = require('../../models/vehicleSchema');
 const pickupDeliverySchema = require('../../models/pickupDeliverySchema');
 const invoiceSchema = require('../../models/invoiceSchema');
 const proofSchema = require('../../models/proofSchema');
+const { getDateArray } = require('../../utility/expiration');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -219,16 +220,64 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
 router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
         const userId = req.user._id;
+        const { orderId } = req.query;
+        // console.log(userId);
+        let match;
+        let anotherMatch = [];
+
+        if (orderId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(orderId)
+            })
+        }
+        if ('rideType' in req.query) {
+            anotherMatch.push({
+                rideType: parseInt(req.query.rideType)
+            })
+        }
+        let timeMatch = { $match: {} }
+        if ('start' in req.query && 'end' in req.query) {
+            let [day, month, year] = req.query.start.split('/');
+            let startIs = new Date(+year, month - 1, +day);
+            [day, month, year] = req.query.end.split('/');
+            let endIs = new Date(+year, month - 1, +day);
+            console.log(startIs + " " + endIs);
+            if (startIs != undefined && isNaN(startIs) == false && endIs != undefined && isNaN(endIs) == false) {
+                let array = getDateArray(startIs, endIs);
+                // console.log(array);
+                timeMatch = {
+                    $match: {
+                        date: { $in: array }
+                    }
+                };
+            }
+            else {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "please pass valid dates" });
+            }
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        // console.log(match);
+        // console.log(timeMatch);
         const checkUser = await pickupDeliverySchema.aggregate([
+            match,
             {
                 $match: {
                     $and: [
-                        {
-                            riderId: mongoose.Types.ObjectId(userId)
-                        },
-                        {
-                            status: { $in: [2, 3, 4] }
-                        }
+                        { riderId: mongoose.Types.ObjectId(userId) },
+                        { status: { $in: [2, 3, 4] } }
                     ]
                 }
             },
@@ -359,12 +408,14 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
                             ],
                             default: "Did not match"
                         }
-                    }
+                    },
+                    date: "$timeData.date"
                 }
             },
             {
                 $sort: { updatedAt: -1 }
             },
+            timeMatch,
             {
                 $project: {
                     pickupTimeData: 0,
@@ -391,7 +442,7 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
 })
 router.get('/getTodayOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
-        const userId = req.user._id;
+        const userId = req.query.riderId;
         // let currentDate = moment()
         //     .tz('America/Panama').format("DD/MM/YYYY")
         let currentDate = "01/12/2022"
@@ -565,6 +616,9 @@ router.get('/getTodayOrders', authenticateToken, checkUserRole(["rider"]), async
         if (checkUser.length == 0) {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no any order assigned" });
         }
+        for (i = 0; i < checkUser.length; i++) {
+            let update = await pickupDeliverySchema.findByIdAndUpdate(checkUser[0]._id, { status: 2 }, { new: true })
+        }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser }, message: "order found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
@@ -589,6 +643,235 @@ router.put('/updateOrder', authenticateToken, checkUserRole(['superAdmin', 'admi
         return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
     }
     catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getUserOrders', authenticateToken, async (req, res) => {
+    try {
+        const { orderId } = req.query;
+        const userId = req.user._id;
+        // console.log(userId);
+        let match;
+        let anotherMatch = [];
+
+        if (orderId != undefined) {
+            anotherMatch.push({
+                _id: mongoose.Types.ObjectId(orderId)
+            })
+        }
+
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        let getUsers = await invoiceSchema.aggregate([
+            match,
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $sort: { createdAt: -1 }
+            },
+            {
+                $lookup: {
+                    from: "coupons",
+                    let: { couponId: "$couponId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$couponId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "couponData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "daywises",
+                    let: { deliveryId: "$deliveryTimeId", pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$deliveryId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "deliveryTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "daywises",
+                    let: { pickupId: "$pickupTimeId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$pickupId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "pickupTime"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    let: { userId: "$userId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "userData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: { addressId: "$pickupAddressId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "pickupAddressData"
+                }
+            },
+            {
+                $lookup: {
+                    from: "addresses",
+                    let: { addressId: "$deliveryAddressId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
+                        $project: {
+                            _id: 0,
+                            __v: 0
+                        }
+                    }],
+                    as: "deliveryAddressData"
+                }
+            },
+            {
+                $addFields: {
+
+                    pickupAddressData: { $first: "$pickupAddressData" },
+                    deliveryAddressData: { $first: "$deliveryAddressData" }
+                }
+            },
+            {
+                $lookup: {
+                    from: "orderitems",
+                    let: { id: "$_id" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$orderId", "$$id"] } } },
+                        {
+                            $lookup:
+                            {
+                                from: "categories",
+                                let: { categoryId: "$categoryId" },
+                                pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$categoryId"] } } }, { $addFields: { id: "$_id" } }, { $project: { _id: 0, __v: 0 } }],
+                                as: "categoryData"
+                            }
+                        },
+                        {
+                            $addFields: {
+                                categoryName: { $first: "$categoryData" },
+                                id: "$_id"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0, __v: 0
+                            }
+                        },
+                        {
+                            $lookup:
+                            {
+                                from: "items",
+                                let: { id: "$itemId" },
+                                pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$id"] } } }, { $addFields: { id: "$_id" } }, { $project: { _id: 0, __v: 0 } }],
+                                as: "itemData"
+                            }
+                        }, {
+                            $addFields: {
+                                itemData: { $first: "$itemData" }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: "$categoryName",
+                                items: { $push: "$$ROOT" }
+                            }
+                        },
+                        {
+                            $addFields: {
+                                name: "$_id.name",
+                                categoryData: "$_id"
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0
+                            }
+                        }
+                    ],
+                    as: "orderItems"
+                }
+            },
+            {
+                $addFields: {
+                    invoiceId: "$orderId",
+                    paymentStatus: { $cond: { if: { $and: [{ $isArray: "$paymentId" }, { $gte: [{ $size: "$paymentId" }, 1] }] }, then: 1, else: 0 } },
+                    invoiceStatus: "$status",
+                    amount: "$orderAmount",
+                    name: { $first: "$userData.name" },
+                    addressData: { $first: "$addressData" },
+                    deliveryTime: { $first: "$deliveryTime" },
+                    pickupTime: { $first: "$pickupTime" }
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    __v: 0,
+                    _id: 0,
+                    password: 0,
+                    otp: 0,
+                    generatedTime: 0,
+                    userData: 0,
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            }
+        ])
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: orderId != undefined && getUsers.length > 0 ? getUsers[0] : getUsers }, message: getUsers.length > 0 ? `invoice order found` : "no any invoice orders found" });
+    } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })

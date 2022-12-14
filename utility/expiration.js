@@ -102,6 +102,9 @@ exports.getDateArray = (start, end) => {
     var dt = new Date(start);
     while (dt <= end) {
         arr.push(`${new Date(dt).getDate()}/${new Date(dt).getMonth() + 1}/${new Date(dt).getFullYear()}`);
+        if (new Date(dt).getDate().toString().length == 1) {
+            arr.push(`0${new Date(dt).getDate()}/${new Date(dt).getMonth() + 1}/${new Date(dt).getFullYear()}`);
+        }
         dt.setDate(dt.getDate() + 1);
     }
     return arr;
