@@ -1069,6 +1069,64 @@ router.get('/getUsers', authenticateToken, checkUserRole(['superAdmin', 'admin']
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getInsurance', authenticateToken, async (req, res) => {
+    try {
+        const { userId } = req.user._id;
+        let getInsurance = await riderSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $addFields: {
+                    insuranceStatus: { $cond: { if: { $ne: ["$riderInsurance", ""] }, then: true, else: false }, }
+                }
+            },
+            {
+                $project: {
+                    riderExpiry: 1,
+                    riderInsurance: 1
+                }
+            }
+        ])
+        let getRiderVehicle = await riderSchema.aggregate([
+            {
+                $match: {
+                    rideId: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $project: {
+                    insuranceNumber: 1,
+                    vehicleInsurance: 1,
+                    insuranceExpiry: 1
+                }
+            }
+        ])
+        if (getInsurance.length == 0) {
+            getInsurance = [
+                {
+                    riderExpiry: "",
+                    riderInsurance: "",
+                    insuranceStatus: false
+                }
+            ]
+        }
+        if (getRiderVehicle.length == 0) {
+            getRiderVehicle = [
+                {
+                    insuranceNumber: "",
+                    vehicleInsurance: false,
+                    insuranceExpiry: ""
+                }
+            ]
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign(getInsurance[0], getRiderVehicle[0]) }, message: "insurance details found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 
 router.get('/refresh', generateRefreshToken);
 
