@@ -1093,10 +1093,10 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
         const { orderId } = req.query;
         let match;
         let anotherMatch = [];
-        // if ('name' in req.query) {
-        //     let regEx = new RegExp(req.query.name, 'i')
-        //     anotherMatch.push({ name: { $regex: regEx } })
-        // }
+        if ('name' in req.query) {
+            let regEx = new RegExp(req.query.name, 'i')
+            anotherMatch.push({ name: { $regex: regEx } })
+        }
         if ('userId' in req.query) {
             anotherMatch.push({ userId: mongoose.Types.ObjectId(req.query.userId) })
         }
@@ -1164,6 +1164,19 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
         }
         console.log(match);
         let getUsers = await invoiceSchema.aggregate([
+            {
+                $lookup: {
+                    from: "users",
+                    let: { userId: "$userId" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }],
+                    as: "userData"
+                }
+            },
+            {
+                $addFields: {
+                    name: { $first: "$userData.name" }
+                }
+            },
             match,
             {
                 $addFields: {
@@ -1184,14 +1197,6 @@ router.get('/getOrders', authenticateToken, checkUserRole(['superAdmin', 'admin'
                     let: { pickupId: "$pickupTimeId" },
                     pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$pickupId"] } } }],
                     as: "pickupTime"
-                }
-            },
-            {
-                $lookup: {
-                    from: "users",
-                    let: { userId: "$userId" },
-                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$userId"] } } }],
-                    as: "userData"
                 }
             },
             {
