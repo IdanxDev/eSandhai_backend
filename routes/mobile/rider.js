@@ -22,6 +22,7 @@ const { uploadProfileImageToS3, removeObject } = require('../../utility/aws');
 const vehicleSchema = require('../../models/vehicleSchema');
 const pickupDeliverySchema = require('../../models/pickupDeliverySchema');
 const invoiceSchema = require('../../models/invoiceSchema');
+const proofSchema = require('../../models/proofSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -1128,6 +1129,97 @@ router.get('/getInsurance', authenticateToken, async (req, res) => {
     }
 })
 
+router.post('/addProof', authenticateToken, uploadProfileImageToS3('proof').single('image'),
+    [body('title').notEmpty().isString().withMessage("please pass subscription name"),
+    body('isVerified').optional().isBoolean().withMessage("please pass boolean for visibility"),
+    ]
+    , checkErr, async (req, res) => {
+        try {
+            const { title, isVerified } = req.body;
+            const userId = req.user._id;
+            if (req.file == undefined || req.file.location == undefined) {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please upload icon image` });
+            }
+            let checkProof = await proofSchema.findOne({ userId: userId, title: title, isVerified: false });
+            if (checkProof != undefined && checkProof != null) {
+                return res.status(403).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `proof already exist` });
+            }
+            let addProof = new proofSchema({
+                title: title,
+                userId: userId,
+                isVerified: isVerified,
+                image: req.file != undefined ? req.file.location : ""
+            })
+            await addProof.save();
+            addProof._doc['id'] = addProof._doc['_id'];
+            delete addProof._doc.updatedAt;
+            delete addProof._doc.createdAt;
+            delete addProof._doc._id;
+            delete addProof._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addProof }, message: `${title} proof added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+
+router.put('/updateProof', authenticateToken, uploadProfileImageToS3('proof').single('image'),
+    [
+        body('proofId', 'please pass valid proof id').notEmpty().custom((value) => mongoose.Types.ObjectId.isValid(value))
+    ]
+    , checkErr, async (req, res) => {
+        try {
+            const { proofId, isVerified, description } = req.body;
+            let checkProof = await proofSchema.findById(proofId);
+            if (checkProof == undefined || checkProof == null) {
+                return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `no proof found` });
+            }
+            let removeProof = await proofSchema.findByIdAndUpdate(proofId, { isVerified: isVerified, description: description }, { new: true });
+            removeProof._doc['id'] = removeProof._doc['_id'];
+            delete removeProof._doc.updatedAt;
+            delete removeProof._doc.createdAt;
+            delete removeProof._doc._id;
+            delete removeProof._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: removeProof }, message: 'proof updated' });
+
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: addProof }, message: `${title} proof added` });
+        } catch (error) {
+            return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+        }
+    })
+
+router.get('/getProof', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        let checkUser = await proofSchema.aggregate([
+            {
+                $match: {
+                    userId: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $dateToString: { format: "%d-%m-%Y %H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAt: { $dateToString: { format: "%d-%m-%Y %H:%M:%S", date: "$updatedAt", timezone: "-04:00" } }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ]);
+
+        return res.status(checkUser.length > 0 ? 200 : 404).json({ issuccess: checkUser.length > 0 ? true : false, data: { acknowledgement: checkUser.length > 0 ? true : false, data: checkUser }, message: checkUser.length > 0 ? `rider proof found` : 'rider proof not found' });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/refresh', generateRefreshToken);
 
 function validateEmail(emailAdress) {
