@@ -1421,11 +1421,11 @@ router.post('/addProof', authenticateToken, uploadProfileImageToS3('proof').sing
             const { title, isVerified } = req.body;
             const userId = req.user._id;
             if (req.file == undefined || req.file.location == undefined) {
-                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `please upload icon image` });
+                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `please upload icon image` });
             }
             let checkProof = await proofSchema.findOne({ userId: userId, title: title, isVerified: false });
             if (checkProof != undefined && checkProof != null) {
-                return res.status(403).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `proof already exist` });
+                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `proof already exist` });
             }
             let addProof = new proofSchema({
                 title: title,
@@ -1454,7 +1454,7 @@ router.put('/updateProof', authenticateToken, uploadProfileImageToS3('proof').si
             const { proofId, isVerified, description } = req.body;
             let checkProof = await proofSchema.findById(proofId);
             if (checkProof == undefined || checkProof == null) {
-                return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `no proof found` });
+                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `no proof found` });
             }
             let removeProof = await proofSchema.findByIdAndUpdate(proofId, { isVerified: isVerified, description: description }, { new: true });
             removeProof._doc['id'] = removeProof._doc['_id'];
@@ -1498,7 +1498,7 @@ router.get('/getProof', authenticateToken, async (req, res, next) => {
             }
         ]);
 
-        return res.status(checkUser.length > 0 ? 200 : 404).json({ issuccess: checkUser.length > 0 ? true : false, data: { acknowledgement: checkUser.length > 0 ? true : false, data: checkUser }, message: checkUser.length > 0 ? `rider proof found` : 'rider proof not found' });
+        return res.status(checkUser.length > 0 ? 200 : 200).json({ issuccess: checkUser.length > 0 ? true : false, data: { acknowledgement: checkUser.length > 0 ? true : false, data: checkUser }, message: checkUser.length > 0 ? `rider proof found` : 'rider proof not found' });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
