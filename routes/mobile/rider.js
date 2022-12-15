@@ -442,7 +442,7 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
 })
 router.get('/getTodayOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
-        const userId = req.query.riderId;
+        const userId = req.user._id;
         // let currentDate = moment()
         //     .tz('America/Panama').format("DD/MM/YYYY")
         let currentDate = "01/12/2022"
