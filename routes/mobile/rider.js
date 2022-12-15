@@ -443,11 +443,35 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
 router.get('/getTodayOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
         const userId = req.user._id;
+        let match;
+        let anotherMatch = [];
+
+        if ('rideType' in req.query) {
+            anotherMatch.push({
+                rideType: parseInt(req.query.rideType)
+            })
+        }
+        if (anotherMatch.length > 0) {
+            match = {
+                $match: {
+                    $and: anotherMatch
+                }
+            }
+        }
+        else {
+            match = {
+                $match: {
+
+                }
+            }
+        }
+        console.log(match);
         // let currentDate = moment()
         //     .tz('America/Panama').format("DD/MM/YYYY")
         let currentDate = "01/12/2022"
         console.log(currentDate);
         const checkUser = await pickupDeliverySchema.aggregate([
+            match,
             {
                 $match: {
                     $and: [{
