@@ -2662,7 +2662,7 @@ router.get('/getCoupons', authenticateToken, async (req, res) => {
                 }
             }
         ])
-        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: getUsers.length > 0 ? true : false, data: getUsers }, message: getUsers.length > 0 ? `coupons found` : "no any coupon found" });
+        return res.status(getUsers.length > 0 ? 200 : 200).json({ issuccess: true, data: { acknowledgement: getUsers.length > 0 ? true : false, data: getUsers }, message: getUsers.length > 0 ? `coupons found` : "no any coupon found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
@@ -3642,7 +3642,7 @@ router.get('/getPlan', authenticateToken, async (req, res) => {
                 }
             }
         ])
-        return res.status(getUsers.length > 0 ? 200 : 404).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `subscription found` : "no subscription plan found" });
+        return res.status(getUsers.length > 0 ? 200 : 200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `subscription found` : "no subscription plan found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
