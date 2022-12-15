@@ -1456,7 +1456,7 @@ router.put('/updateProof', authenticateToken, uploadProfileImageToS3('proof').si
             if (checkProof == undefined || checkProof == null) {
                 return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: `no proof found` });
             }
-            let removeProof = await proofSchema.findByIdAndUpdate(proofId, { isVerified: isVerified, description: description }, { new: true });
+            let removeProof = await proofSchema.findByIdAndUpdate(proofId, { isVerified: isVerified, image: req.file != undefined ? req.file.location : checkProof.image, description: description }, { new: true });
             removeProof._doc['id'] = removeProof._doc['_id'];
             delete removeProof._doc.updatedAt;
             delete removeProof._doc.createdAt;
