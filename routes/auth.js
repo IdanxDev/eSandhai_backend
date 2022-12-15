@@ -35,6 +35,7 @@ const categorySchema = require('../models/categorySchema');
 const helperSchema = require('../models/helperSchema');
 const timeSchema = require('../models/timeSchema');
 const contactUsSchema = require('../models/contactUsSchema');
+const couponSchema = require('../models/couponSchema');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -2646,13 +2647,51 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
 router.put('/updateOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, couponId, note } = req.body;
+        const userId = req.user._id
         let checkOrder = await invoiceSchema.findById(orderId);
         let checkSubscription = await checkUserSubscriptionMember(userId);
 
         if (checkOrder != undefined && checkOrder != null) {
+            if (checkOrder.status == 1 && (couponId != undefined && couponId != null)) {
+                console.log("here");
+                let checkCoupon = await couponSchema.findById(couponId);
+                let amount = checkOrder.finalAmount;
+                let taxes = checkOrder.taxes;
+                if (checkCoupon != undefined && checkCoupon != null) {
+                    if (checkCoupon.minimumAmount != 0 && checkCoupon.minimumAmount > checkCoupon.orderAmount) {
+                        return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon code not applicable' });
+                    }
+                    if (checkCoupon.isOnce == true) {
+                        console.log("isonce");
+                        let checkCoupon = await invoiceSchema.findOne({ userId: mongoose.Types.ObjectId(checkOrder.userId), couponId: mongoose.Types.ObjectId(couponId), status: { $nin: [11, 0, 12, 1] } });
+                        // console.log(checkCoupon);
+                        if (checkCoupon != undefined && checkCoupon != null) {
+                            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon already used once' });
+                        }
+                    }
+                    if ('percentage' in checkCoupon && checkCoupon.percentage == true) {
+                        amount = amount - ((checkCoupon.discount / 100) * amount)
+                        taxes.set('discount', checkCoupon.discount)
+                    }
+                    else {
+                        amount = amount - checkCoupon.discount;
+                        taxes.set('discount', checkCoupon.discount)
+                    }
+                }
+                console.log(taxes);
+                console.log(amount);
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { couponId: couponId, orderTotalAmount: amount, taxes: taxes, pendingAmount: amount }, { new: true });
+                updateOrder._doc['id'] = updateOrder._doc['_id'];
+                delete updateOrder._doc.updatedAt;
+                delete updateOrder._doc.createdAt;
+                delete updateOrder._doc._id;
+                delete updateOrder._doc.__v;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+
+            }
             if (status == 1) {
                 if (checkSubscription != undefined && 'isSubscription' in checkSubscription && 'isMember' in checkSubscription && checkSubscription.isSubscription == false && checkSubscription.isMember == false && totalAmount < 15) {
-                    return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
+                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
                 }
             }
 
