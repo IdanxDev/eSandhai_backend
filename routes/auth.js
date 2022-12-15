@@ -1192,7 +1192,7 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                             __v: 0
                         }
                     }],
-                    as: "deliveryTime"
+                    as: "deliveryTimeData"
                 }
             },
             {
@@ -1205,7 +1205,7 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                             __v: 0
                         }
                     }],
-                    as: "pickupTime"
+                    as: "pickupTimeData"
                 }
             },
             {
@@ -1250,7 +1250,6 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
             },
             {
                 $addFields: {
-
                     pickupAddressData: { $first: "$pickupAddressData" },
                     deliveryAddressData: { $first: "$deliveryAddressData" }
                 }
@@ -1323,8 +1322,10 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                     amount: "$orderAmount",
                     name: { $first: "$userData.name" },
                     addressData: { $first: "$addressData" },
-                    deliveryTime: { $first: "$deliveryTime.timeSlot" },
-                    pickupTime: { $first: "$pickupTime.timeSlot" }
+                    deliveryDate: { $first: "$deliveryTimeData.date" },
+                    pickupDate: { $first: "$pickupTimeData.date" },
+                    deliveryTime: { $first: "$deliveryTimeData.timeSlot" },
+                    pickupTime: { $first: "$pickupTimeData.timeSlot" }
                 }
             },
             {
@@ -1352,7 +1353,9 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                     createdAtDate: 0,
                     updatedAtDate: 0,
                     createdAtTime: 0,
-                    updatedAtTime: 0
+                    updatedAtTime: 0,
+                    pickupTimeData: 0,
+                    deliveryTimeData: 0
                 }
             }
         ])
@@ -1833,6 +1836,53 @@ router.get('/getSuggestions', async (req, res, next) => {
         let places = await getPlaces(text);
         let filterPlace = await placeFilter(places)
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: filterPlace.length > 0 ? filterPlace : [] }, message: filterPlace.length > 0 ? "places details found" : "no any place found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getPlan', async (req, res) => {
+    try {
+        let getUsers = await subscriptionSchema.aggregate([
+            {
+                $match: {
+                    isVisible: true
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id"
+                }
+            },
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $project: {
+                    createdAtDate: 0,
+                    updatedAtDate: 0,
+                    createdAtTime: 0,
+                    updatedAtTime: 0
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ])
+        return res.status(getUsers.length > 0 ? 200 : 200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `subscription found` : "no subscription plan found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
