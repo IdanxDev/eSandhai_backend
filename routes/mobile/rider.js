@@ -224,7 +224,9 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
         // console.log(userId);
         let match;
         let anotherMatch = [];
-
+        let currentDate = moment('2022-11-30T00:55:38-05:00')
+            .tz('America/Panama')
+        console.log(new Date(currentDate))
         if (orderId != undefined) {
             anotherMatch.push({
                 _id: mongoose.Types.ObjectId(orderId)
@@ -235,7 +237,7 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
                 rideType: parseInt(req.query.rideType)
             })
         }
-        let timeMatch = { $match: {} }
+        let timeMatch = { $match: { dateType: { $gt: new Date(currentDate) } } }
         if ('start' in req.query && 'end' in req.query) {
             let [day, month, year] = req.query.start.split('/');
             let startIs = new Date(+year, month - 1, +day);
@@ -276,8 +278,7 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
             {
                 $match: {
                     $and: [
-                        { riderId: mongoose.Types.ObjectId(userId) },
-                        { status: { $in: [2, 3, 4] } }
+                        { riderId: mongoose.Types.ObjectId(userId) }
                     ]
                 }
             },
@@ -415,11 +416,23 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
             {
                 $sort: { updatedAt: -1 }
             },
+            {
+                $addFields: {
+                    dateType: {
+                        $dateFromString: {
+                            dateString: "$date",
+                            format: "%d/%m/%Y",
+                            timezone: "America/Panama"
+                        }
+                    }
+                }
+            },
             timeMatch,
             {
                 $project: {
                     pickupTimeData: 0,
                     deliveryTimeData: 0,
+                    // dateType: 0,
                     "orderData.pickupAddressData": 0,
                     "orderData.deliveryAddressData": 0,
                     "orderData.pickupAddress": 0,
