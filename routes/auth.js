@@ -1726,7 +1726,7 @@ router.get('/getApkLink', [check("mobileNo", "please enter mobile no").isString(
             }
         ])
         await sendSms(countryCode + mobileNo, `Hello User , Welcome to Delux cleaning system  here is our apk link you can check it out, For Android ${getUsers[0].apkLink} , For Ios ${getUsers[1].apkLink}`);
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category found` : "no category found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `apk links found and sent` : "no any apk link found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
