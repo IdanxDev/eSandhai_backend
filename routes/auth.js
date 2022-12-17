@@ -1709,7 +1709,7 @@ router.post('/setPassword', [oneOf([body('id').isEmail(), body('id').isMobilePho
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.get('/getApkLink', authenticateToken, [check("mobileNo", "please enter mobile no").isString().notEmpty(), check("countryCode", "please enter country code").isString().notEmpty()], checkErr, async (req, res) => {
+router.get('/getApkLink', [check("mobileNo", "please enter mobile no").isString().notEmpty(), check("countryCode", "please enter country code").isString().notEmpty()], checkErr, async (req, res) => {
     try {
         const { mobileNo, countryCode } = req.query
         let getUsers = await apkLinkSchema.aggregate([
@@ -2625,14 +2625,14 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             taxApplied = taxes.taxes;
             payableAmount = parseFloat(getOrder.orderAmount) + parseFloat((Object.values(taxApplied)).reduce((a, b) => a + b, 0))
             if (JSON.stringify(getOrder.taxes) != JSON.stringify(taxApplied)) {
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount, orderTotalAmount: payableAmount })
             }
         }
         else {
             if (JSON.stringify(getOrder.taxes) != JSON.stringify({})) {
                 taxApplied = {};
                 payableAmount = parseFloat(getOrder.orderAmount) + parseFloat(0)
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount, orderTotalAmount: payableAmount })
             }
         }
         let getItem = await itemSchema.findById(itemId);
@@ -2664,7 +2664,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, {
                 $inc: {
                     orderAmount: finalAmount, finalAmount: finalAmount,
-                    pendingAmount: finalAmount
+                    pendingAmount: finalAmount, orderTotalAmount: finalAmount
                 }
             }, { new: true });
             updateQty._doc['id'] = updateQty._doc['_id'];
@@ -2682,7 +2682,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             orderId: orderId
         })
         await addItem.save();
-        let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount } }, { new: true });
+        let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount, finalAmount: finalAmount, orderTotalAmount: finalAmount } }, { new: true });
         addItem._doc['id'] = addItem._doc['_id'];
         delete addItem._doc.updatedAt;
         delete addItem._doc.createdAt;
@@ -2696,7 +2696,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
 })
 router.put('/updateOrder', authenticateToken, async (req, res, next) => {
     try {
-        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, couponId, note } = req.body;
+        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, couponCode, note } = req.body;
         const userId = req.user._id
         let checkOrder = await invoiceSchema.findById(orderId);
         let checkSubscription = await checkUserSubscriptionMember(userId);
@@ -2704,7 +2704,7 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
         if (checkOrder != undefined && checkOrder != null) {
             if (checkOrder.status == 1 && (couponId != undefined && couponId != null)) {
                 console.log("here");
-                let checkCoupon = await couponSchema.findById(couponId);
+                let checkCoupon = await couponSchema.findOne({ name: couponCode, isExpire: false });
                 let amount = checkOrder.finalAmount;
                 let taxes = checkOrder.taxes;
                 if (checkCoupon != undefined && checkCoupon != null) {
@@ -2727,6 +2727,9 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                         amount = amount - checkCoupon.discount;
                         taxes.set('discount', checkCoupon.discount)
                     }
+                }
+                else {
+                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon not found' });
                 }
                 console.log(taxes);
                 console.log(amount);

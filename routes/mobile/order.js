@@ -72,6 +72,7 @@ router.post('/addOrder', authenticateToken, async (req, res, next) => {
             isMember: checkSubscription.isMember,
             orderAmount: totalAmount,
             finalAmount: payableAmount,
+            orderTotalAmount: payableAmount,
             pendingAmount: payableAmount,
             userId: userId
         })
@@ -198,14 +199,14 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             taxApplied = taxes.taxes;
             payableAmount = parseFloat(getOrder.orderAmount) + parseFloat((Object.values(taxApplied)).reduce((a, b) => a + b, 0))
             if (JSON.stringify(getOrder.taxes) != JSON.stringify(taxApplied)) {
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount, orderTotalAmount: payableAmount })
             }
         }
         else {
             if (JSON.stringify(getOrder.taxes) != JSON.stringify({})) {
                 taxApplied = {};
                 payableAmount = parseFloat(getOrder.orderAmount) + parseFloat(0)
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount, orderTotalAmount: payableAmount })
             }
         }
         let getItem = await itemSchema.findById(itemId);
@@ -237,7 +238,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, {
                 $inc: {
                     orderAmount: finalAmount, finalAmount: finalAmount,
-                    pendingAmount: finalAmount
+                    pendingAmount: finalAmount, orderTotalAmount: finalAmount
                 }
             }, { new: true });
             updateQty._doc['id'] = updateQty._doc['_id'];
@@ -255,7 +256,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
             orderId: orderId
         })
         await addItem.save();
-        let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount } }, { new: true });
+        let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount, finalAmount: finalAmount, orderTotalAmount: finalAmount } }, { new: true });
         addItem._doc['id'] = addItem._doc['_id'];
         delete addItem._doc.updatedAt;
         delete addItem._doc.createdAt;
