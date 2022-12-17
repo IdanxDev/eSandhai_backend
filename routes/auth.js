@@ -2702,7 +2702,7 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
         let checkSubscription = await checkUserSubscriptionMember(userId);
 
         if (checkOrder != undefined && checkOrder != null) {
-            if (checkOrder.status == 1 && (couponId != undefined && couponId != null)) {
+            if (checkOrder.status == 1 && (couponCode != undefined && couponCode != null)) {
                 console.log("here");
                 let checkCoupon = await couponSchema.findOne({ name: couponCode, isExpire: false });
                 let amount = checkOrder.finalAmount;
@@ -2713,9 +2713,9 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                     }
                     if (checkCoupon.isOnce == true) {
                         console.log("isonce");
-                        let checkCoupon = await invoiceSchema.findOne({ userId: mongoose.Types.ObjectId(checkOrder.userId), couponId: mongoose.Types.ObjectId(couponId), status: { $nin: [11, 0, 12, 1] } });
+                        let checkCouponExist = await invoiceSchema.findOne({ userId: mongoose.Types.ObjectId(checkOrder.userId), couponId: mongoose.Types.ObjectId(checkCoupon._id), status: { $nin: [11, 0, 12, 1] } });
                         // console.log(checkCoupon);
-                        if (checkCoupon != undefined && checkCoupon != null) {
+                        if (checkCouponExist != undefined && checkCouponExist != null) {
                             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon already used once' });
                         }
                     }
@@ -2733,7 +2733,7 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                 }
                 console.log(taxes);
                 console.log(amount);
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { couponId: couponId, orderTotalAmount: amount, taxes: taxes, pendingAmount: amount }, { new: true });
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { couponId: checkCoupon._id, orderTotalAmount: amount, taxes: taxes, pendingAmount: amount }, { new: true });
                 updateOrder._doc['id'] = updateOrder._doc['_id'];
                 delete updateOrder._doc.updatedAt;
                 delete updateOrder._doc.createdAt;
