@@ -228,16 +228,16 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
         let currentDate = moment('2022-11-30T00:55:38-05:00')
             .tz('America/Panama')
         console.log(new Date(currentDate))
-        if (orderId != undefined || orderId != "") {
+        if (orderId != undefined && orderId != "") {
             anotherMatch.push({
                 _id: mongoose.Types.ObjectId(orderId)
             })
         }
-        if (rideIds != undefined || rideIds != "") {
+        if (rideIds != undefined && rideIds != "") {
             let regEx = new RegExp(rideIds, 'i')
             orderIdsMatch = { $match: { idString: { $regex: regEx } } }
         }
-        if ('rideType' in req.query || req.query.rideType != "") {
+        if ('rideType' in req.query && req.query.rideType != "") {
             anotherMatch.push({
                 rideType: parseInt(req.query.rideType)
             })
