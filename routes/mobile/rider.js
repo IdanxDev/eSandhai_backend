@@ -220,7 +220,7 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
 router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
         const userId = req.user._id;
-        const { orderId, orderIds } = req.query;
+        const { orderId, rideIds } = req.query;
         // console.log(userId);
         let match;
         let anotherMatch = [];
@@ -233,8 +233,8 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
                 _id: mongoose.Types.ObjectId(orderId)
             })
         }
-        if (orderIds != undefined) {
-            let regEx = new RegExp(orderIds, 'i')
+        if (rideIds != undefined) {
+            let regEx = new RegExp(rideIds, 'i')
             orderIdsMatch = { $match: { idString: { $regex: regEx } } }
         }
         if ('rideType' in req.query) {
@@ -415,7 +415,7 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
                             default: "Did not match"
                         }
                     },
-                    idString: { $toString: "$orderId" },
+                    idString: { $toString: "$rideId" },
                     date: "$timeData.date"
                 }
             },
