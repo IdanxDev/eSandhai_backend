@@ -2160,7 +2160,7 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription plan not found` });
         }
 
-        let checkActiveSubscription = await userSubscription.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }] } }])
+        let checkActiveSubscription = await userSubscription.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 1 }] } }])
         if (checkActiveSubscription != undefined && checkActiveSubscription != null && checkActiveSubscription.length > 0) {
             return res.status(403).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `subscription already running` });
         }
