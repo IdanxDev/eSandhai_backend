@@ -2191,7 +2191,7 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
         delete createAddress._doc.__v;
         delete createAddress._doc.paymentId;
         delete createAddress._doc.orderStatus;
-        createAddress['link'] = 'https://www.google.com/'
+        createAddress._doc['link'] = 'https://www.google.com/'
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user subscription added" });
 
     } catch (error) {
@@ -2363,7 +2363,7 @@ router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => 
         delete createAddress._doc.__v;
         delete createAddress._doc.paymentId;
         delete createAddress._doc.orderStatus;
-        createAddress['link'] = 'https://www.google.com/'
+        createAddress._doc['link'] = 'https://www.google.com/'
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user membership added" });
     } catch (error) {
         console.log(error.message);
