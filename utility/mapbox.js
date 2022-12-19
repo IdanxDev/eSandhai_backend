@@ -6,7 +6,7 @@ exports.getPlaces = (keyword, limit) => {
         url: `https://api.mapbox.com/geocoding/v5/mapbox.places/${keyword}.json?country=us&limit=${limit}&types=place%2Cpostcode%2Caddress%2Ccountry%2Cregion%2Cdistrict%2Clocality%2Cneighborhood%2Cpoi&language=en&access_token=${process.env.MAPBOX_TOKEN}`,
         headers: {}
     };
-
+    console.log(`https://api.mapbox.com/geocoding/v5/mapbox.places/${keyword}.json?country=us&limit=${limit}&types=place%2Cpostcode%2Caddress%2Ccountry%2Cregion%2Cdistrict%2Clocality%2Cneighborhood%2Cpoi&language=en&access_token=${process.env.MAPBOX_TOKEN}`)
     return new Promise((resolve, reject) => {
         axios(config)
             .then(function (response) {

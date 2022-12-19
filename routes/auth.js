@@ -9,7 +9,7 @@ const userSchema = require('../models/userModel');
 const { getCurrentDateTime24, makeid } = require('../utility/dates');
 const nodemailer = require("nodemailer");
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember } = require('../utility/expiration');
+const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember, getUserMembershipSubscription } = require('../utility/expiration');
 var admin = require('../utility/setup/firebase-admin');
 const { getAuth } = require("firebase-admin/auth");
 const { check, body, oneOf } = require('express-validator')
@@ -1439,7 +1439,8 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
             return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: "no user details found" });
 
         }
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser[0] }, message: "user details found" });
+        let getSubscription = await getUserMembershipSubscription(userId)
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign(checkUser[0], getSubscription) }, message: "user details found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
@@ -1833,7 +1834,7 @@ router.get('/getSuggestions', async (req, res, next) => {
         // const userId = req.user._id
         const { text } = req.query;
         // console.log(req.user._id);
-        let places = await getPlaces(text);
+        let places = await getPlaces(text, 10);
         let filterPlace = await placeFilter(places)
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: filterPlace.length > 0 ? filterPlace : [] }, message: filterPlace.length > 0 ? "places details found" : "no any place found" });
     } catch (error) {

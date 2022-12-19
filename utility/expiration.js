@@ -194,8 +194,30 @@ exports.checkUserSubscriptionMember = async (userId) => {
         }
     }])
     if (checkUser.length > 0) {
-        checkUser[0]['isSubscription'] = false
+        // checkUser[0]['isSubscription'] = false
         return checkUser;
     }
     return [{ isSubscription: false, isMember: false }]
+}
+exports.getUserMembershipSubscription = async (userId) => {
+    let checkUser = await userModel.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }, {
+        $lookup: {
+            from: "memberships",
+            let: { userId: "$_id" },
+            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$userId"] }, { $eq: ["$status", 1] }] } } }],
+            as: "membershipDetail"
+        }
+    },
+    {
+        $lookup: {
+            from: "usersubsciptions",
+            let: { userId: "$_id" },
+            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$userId"] }, { $eq: ["$status", 1] }] } } }],
+            as: "subscriptionDetail"
+        }
+    }])
+    if (checkUser.length > 0) {
+        return checkUser[0];
+    }
+    return { membershipDetail: [], subscriptionDetail: [] }
 }
