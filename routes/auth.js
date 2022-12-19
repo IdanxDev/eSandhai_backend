@@ -2776,6 +2776,99 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.put('/getPaymentLink', authenticateToken, async (req, res, next) => {
+    try {
+        const { orderId } = req.body;
+        const userId = req.user._id
+        let checkOrder = await invoiceSchema.findOne({ _id: mongoose.Types.ObjectId(orderId), status: 1 });
+        if (checkOrder != undefined && checkOrder != null) {
+            let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: 2 }, { new: true });
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
+    }
+    catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.put('/update', authenticateToken, async (req, res, next) => {
+    try {
+        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, couponCode, note } = req.body;
+        const userId = req.user._id
+        let checkOrder = await invoiceSchema.findById(orderId);
+        let checkSubscription = await checkUserSubscriptionMember(userId);
+
+        if (checkOrder != undefined && checkOrder != null) {
+            if (checkOrder.status == 1 && (couponCode != undefined && couponCode != null)) {
+                console.log("here");
+                let checkCoupon = await couponSchema.findOne({ name: couponCode, isExpire: false });
+                let amount = checkOrder.finalAmount;
+                let taxes = checkOrder.taxes;
+                if (checkCoupon != undefined && checkCoupon != null) {
+                    if (checkCoupon.minimumAmount != 0 && checkCoupon.minimumAmount > checkCoupon.orderAmount) {
+                        return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon code not applicable' });
+                    }
+                    if (checkCoupon.isOnce == true) {
+                        console.log("isonce");
+                        let checkCouponExist = await invoiceSchema.findOne({ userId: mongoose.Types.ObjectId(checkOrder.userId), couponId: mongoose.Types.ObjectId(checkCoupon._id), status: { $nin: [11, 0, 12, 1] } });
+                        // console.log(checkCoupon);
+                        if (checkCouponExist != undefined && checkCouponExist != null) {
+                            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon already used once' });
+                        }
+                    }
+                    if ('percentage' in checkCoupon && checkCoupon.percentage == true) {
+                        amount = amount - ((checkCoupon.discount / 100) * amount)
+                        taxes.set('discount', checkCoupon.discount)
+                    }
+                    else {
+                        amount = amount - checkCoupon.discount;
+                        taxes.set('discount', checkCoupon.discount)
+                    }
+                }
+                else {
+                    return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon not found' });
+                }
+                console.log(taxes);
+                console.log(amount);
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { couponId: checkCoupon._id, orderTotalAmount: amount, taxes: taxes, pendingAmount: amount }, { new: true });
+                updateOrder._doc['id'] = updateOrder._doc['_id'];
+                delete updateOrder._doc.updatedAt;
+                delete updateOrder._doc.createdAt;
+                delete updateOrder._doc._id;
+                delete updateOrder._doc.__v;
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+
+            }
+            if (status == 1) {
+                if (checkSubscription != undefined && 'isSubscription' in checkSubscription && 'isMember' in checkSubscription && checkSubscription.isSubscription == false && checkSubscription.isMember == false && totalAmount < 15) {
+                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
+                }
+            }
+
+            let update = {
+                status: status,
+                deliveryInstruction: deliveryInstruction,
+                pickupInstruction: pickupInstruction,
+                pickupAddressId: pickupAddressId,
+                deliveryAddressId: deliveryAddressId,
+                paymentId: paymentId,
+                note: note
+            }
+            let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, update, { new: true });
+            updateOrder._doc['id'] = updateOrder._doc['_id'];
+            delete updateOrder._doc.updatedAt;
+            delete updateOrder._doc.createdAt;
+            delete updateOrder._doc._id;
+            delete updateOrder._doc.__v;
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
+    }
+    catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 // router.put('/updateOrderStatus', async (req, res, next) => {
 //     try {
 //         const { delivery, pickup, deliveryTimeId, pickupTimeId, status, orderId, paymentId, note } = req.body;

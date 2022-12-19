@@ -1954,7 +1954,7 @@ router.post('/addApkLink', authenticateToken, checkUserRole(['superAdmin']), [bo
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-router.get('/getApkLink', authenticateToken, async (req, res) => {
+router.get('/getApkLink', async (req, res) => {
     try {
         let getUsers = await apkLinkSchema.aggregate([
 
@@ -4319,6 +4319,7 @@ router.post('/addOrder', authenticateToken, checkUserRole(['superAdmin', 'admin'
             isMember: checkSubscription.isMember,
             orderAmount: totalAmount,
             finalAmount: payableAmount,
+            orderTotalAmount: payableAmount,
             pendingAmount: payableAmount,
             userId: userId
         })
@@ -4360,14 +4361,14 @@ router.post('/addOrderItem', authenticateToken, checkUserRole(['superAdmin', 'ad
             taxApplied = taxes.taxes;
             payableAmount = parseFloat(getOrder.orderAmount) + parseFloat((Object.values(taxApplied)).reduce((a, b) => a + b, 0))
             if (JSON.stringify(getOrder.taxes) != JSON.stringify(taxApplied)) {
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, orderTotalAmount: payableAmount, pendingAmount: payableAmount })
             }
         }
         else {
             if (JSON.stringify(getOrder.taxes) != JSON.stringify({})) {
                 taxApplied = {};
                 payableAmount = parseFloat(getOrder.orderAmount) + parseFloat(0)
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, pendingAmount: payableAmount })
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { taxes: taxApplied, finalAmount: payableAmount, orderTotalAmount: payableAmount, pendingAmount: payableAmount })
             }
         }
         let getItem = await itemSchema.findById(itemId);
@@ -4421,7 +4422,7 @@ router.post('/addOrderItem', authenticateToken, checkUserRole(['superAdmin', 'ad
             let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, {
                 $inc: {
                     orderAmount: finalAmount, finalAmount: finalAmount,
-                    pendingAmount: finalAmount
+                    pendingAmount: finalAmount, orderTotalAmount: finalAmount
                 }
             }, { new: true });
             updateQty._doc['id'] = updateQty._doc['_id'];
@@ -4439,7 +4440,7 @@ router.post('/addOrderItem', authenticateToken, checkUserRole(['superAdmin', 'ad
             orderId: orderId
         })
         await addItem.save();
-        let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount } }, { new: true });
+        let updateItems = await invoiceSchema.findByIdAndUpdate(orderId, { $inc: { orderAmount: finalAmount, finalAmount: finalAmount, orderTotalAmount: finalAmount } }, { new: true });
         addItem._doc['id'] = addItem._doc['_id'];
         delete addItem._doc.updatedAt;
         delete addItem._doc.createdAt;
