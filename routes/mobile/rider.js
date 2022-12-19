@@ -220,10 +220,11 @@ body('activeStatus', 'please enter valid active status').optional().isNumeric()
 router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), async (req, res, next) => {
     try {
         const userId = req.user._id;
-        const { orderId } = req.query;
+        const { orderId, orderIds } = req.query;
         // console.log(userId);
         let match;
         let anotherMatch = [];
+        let orderIdsMatch = { $match: {} }
         let currentDate = moment('2022-11-30T00:55:38-05:00')
             .tz('America/Panama')
         console.log(new Date(currentDate))
@@ -231,6 +232,10 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
             anotherMatch.push({
                 _id: mongoose.Types.ObjectId(orderId)
             })
+        }
+        if (orderIds != undefined) {
+            let regEx = new RegExp(orderIds, 'i')
+            orderIdsMatch = { $match: { idString: { $regex: regEx } } }
         }
         if ('rideType' in req.query) {
             anotherMatch.push({
@@ -410,9 +415,11 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
                             default: "Did not match"
                         }
                     },
+                    idString: { $toString: "$_id" },
                     date: "$timeData.date"
                 }
             },
+            orderIdsMatch,
             {
                 $sort: { updatedAt: -1 }
             },
@@ -432,6 +439,7 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
                 $project: {
                     pickupTimeData: 0,
                     deliveryTimeData: 0,
+                    idString: 0,
                     // dateType: 0,
                     "orderData.pickupAddressData": 0,
                     "orderData.deliveryAddressData": 0,
