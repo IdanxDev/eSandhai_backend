@@ -228,22 +228,22 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
         let currentDate = moment('2022-11-30T00:55:38-05:00')
             .tz('America/Panama')
         console.log(new Date(currentDate))
-        if (orderId != undefined) {
+        if (orderId != undefined || orderId != "") {
             anotherMatch.push({
                 _id: mongoose.Types.ObjectId(orderId)
             })
         }
-        if (rideIds != undefined) {
+        if (rideIds != undefined || rideIds != "") {
             let regEx = new RegExp(rideIds, 'i')
             orderIdsMatch = { $match: { idString: { $regex: regEx } } }
         }
-        if ('rideType' in req.query) {
+        if ('rideType' in req.query || req.query.rideType != "") {
             anotherMatch.push({
                 rideType: parseInt(req.query.rideType)
             })
         }
         let timeMatch = { $match: { dateType: { $gt: new Date(currentDate) } } }
-        if ('start' in req.query && 'end' in req.query) {
+        if ('start' in req.query && 'end' in req.query && req.query.start != "" && req.query.end != "") {
             let [day, month, year] = req.query.start.split('/');
             let startIs = new Date(+year, month - 1, +day);
             [day, month, year] = req.query.end.split('/');

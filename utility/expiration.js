@@ -204,7 +204,15 @@ exports.getUserMembershipSubscription = async (userId) => {
         $lookup: {
             from: "memberships",
             let: { userId: "$_id" },
-            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$userId"] }, { $eq: ["$status", 1] }] } } }],
+            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$userId"] }, { $eq: ["$status", 1] }] } } },
+            {
+                $lookup: {
+                    from: "membershipdetails",
+                    localField: "membershipId",
+                    foreignField: "_id",
+                    as: "membershipData"
+                }
+            }],
             as: "membershipDetail"
         }
     },
@@ -212,7 +220,14 @@ exports.getUserMembershipSubscription = async (userId) => {
         $lookup: {
             from: "usersubsciptions",
             let: { userId: "$_id" },
-            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$userId"] }, { $eq: ["$status", 1] }] } } }],
+            pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$userId", "$$userId"] }, { $eq: ["$status", 1] }] } } }, {
+                $lookup: {
+                    from: "subscriptions",
+                    localField: "planId",
+                    foreignField: "_id",
+                    as: "subscriptionData"
+                }
+            }],
             as: "subscriptionDetail"
         }
     }])
