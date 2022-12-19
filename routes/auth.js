@@ -2730,7 +2730,7 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                     }
                 }
                 else {
-                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon not found' });
+                    return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon not found' });
                 }
                 console.log(taxes);
                 console.log(amount);
