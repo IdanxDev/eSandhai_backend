@@ -2176,6 +2176,7 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
             delivery: checkCategory.delivery,
             price: duration == 0 ? checkCategory.month : (duration == 1 ? checkCategory.quarterly : checkCategory.year),
             duration: duration,
+            status: 1,
             pendingDays: pendingDays,
             usedDays: 0,
             startDate: moment(),
@@ -2190,6 +2191,7 @@ router.post('/addSubscription', authenticateToken, async (req, res, next) => {
         delete createAddress._doc.__v;
         delete createAddress._doc.paymentId;
         delete createAddress._doc.orderStatus;
+        createAddress['link'] = 'https://www.google.com/'
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user subscription added" });
 
     } catch (error) {
@@ -2335,7 +2337,7 @@ router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => 
         if (checkCategory == undefined || checkCategory == null) {
             return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership details not found` });
         }
-        let checkMembership = await membershipSchema.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }] } }])
+        let checkMembership = await membershipSchema.aggregate([{ $match: { $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 1 }] } }])
         if (checkMembership.length > 0) {
             return res.status(403).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `membership already purchased` });
         }
@@ -2346,6 +2348,7 @@ router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => 
             userId: userId,
             price: duration == 0 ? checkCategory.month : (duration == 1 ? checkCategory.quarterly : checkCategory.year),
             startDate: moment(),
+            status: 1,
             endDate: moment().add(pendingDays, 'days'),
             orderId: orderId,
             pendingDays: pendingDays,
@@ -2360,8 +2363,8 @@ router.post('/addDeluxMembership', authenticateToken, async (req, res, next) => 
         delete createAddress._doc.__v;
         delete createAddress._doc.paymentId;
         delete createAddress._doc.orderStatus;
+        createAddress['link'] = 'https://www.google.com/'
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: createAddress }, message: "user membership added" });
-
     } catch (error) {
         console.log(error.message);
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })

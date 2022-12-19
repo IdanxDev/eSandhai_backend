@@ -415,7 +415,7 @@ router.get('/getAssignedOrders', authenticateToken, checkUserRole(["rider"]), as
                             default: "Did not match"
                         }
                     },
-                    idString: { $toString: "$_id" },
+                    idString: { $toString: "$orderId" },
                     date: "$timeData.date"
                 }
             },
