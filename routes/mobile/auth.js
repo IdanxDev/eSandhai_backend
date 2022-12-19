@@ -1073,7 +1073,7 @@ router.get('/getSuggestions', async (req, res, next) => {
         // const userId = req.user._id
         const { text } = req.query;
         // console.log(req.user._id);
-        let places = await getPlaces(text);
+        let places = await getPlaces(text,10);
         let filterPlace = await placeFilter(places)
         return res.status(filterPlace.length > 0 ? 200 : 200).json({ issuccess: filterPlace.length > 0 ? true : false, data: { acknowledgement: true, data: filterPlace.length > 0 ? filterPlace : [] }, message: filterPlace.length > 0 ? "places details found" : "no any place found" });
     } catch (error) {
@@ -1085,7 +1085,7 @@ router.get('/getPlace', async (req, res, next) => {
         // const userId = req.user._id
         const { lat, long } = req.query;
         // console.log(req.user._id);
-        let places = await getPlaces(`${long},${lat}`, 1);
+        let places = await getPlaces(`${long},${lat}`, 10);
         // return res.json(places)
         let filterPlace = await formatAddress(places)
         return res.status(Object.keys(filterPlace).length > 0 ? 200 : 200).json({ issuccess: Object.keys(filterPlace).length > 0 ? true : false, data: { acknowledgement: Object.keys(filterPlace).length > 0 ? true : false, data: Object.keys(filterPlace).length > 0 ? filterPlace : filterPlace }, message: Object.keys(filterPlace).length > 0 ? "address found" : "address not recognized" });

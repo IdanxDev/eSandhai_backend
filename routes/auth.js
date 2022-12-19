@@ -2229,6 +2229,7 @@ router.put('/updateSubscription', authenticateToken, async (req, res, next) => {
 router.get('/getSubscription', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id
+        console.log(userId);
         await checkExpireSubscription();
         let getAddress = await userSubscription.aggregate([
             {
@@ -2788,6 +2789,21 @@ router.put('/getPaymentLink', authenticateToken, async (req, res, next) => {
             let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: 2 }, { new: true });
             updateOrder._doc['link'] = 'https://www.google.com/'
             return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
+    }
+    catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.delete('/removeOrder', authenticateToken, async (req, res, next) => {
+    try {
+        const { orderId } = req.body;
+        const userId = req.user._id
+        let checkOrder = await invoiceSchema.findById(orderId);
+        if (checkOrder != undefined && checkOrder != null) {
+            let updateOrder = await invoiceSchema.findByIdAndDelete(orderId);
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order removed' });
         }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
     }
