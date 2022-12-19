@@ -2500,7 +2500,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body("start", "please provide start hours").optional().notEmpty().isString(),
     body('end', "please provide ending hours").optional().notEmpty().isString(),
     body('isOnce', "please provide valid isOnce").optional().isBoolean(),
-    body('minimumAmount', "please provide minimum amount").notEmpty().isNumeric(),
+    body('minimumAmount', "please provide minimum amount").optional().notEmpty().isNumeric(),
     body('percentage', "please provide valid percentage").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     body('couponId', "please pass valid coupon id").custom((value) => mongoose.Types.ObjectId.isValid(value))
@@ -2508,8 +2508,9 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
         try {
             const { name,
                 description, terms, discount, start, end, isOnce, isVisible, minimumAmount, percentage, couponId } = req.body;
-
+            console.log(couponId);
             let checkCategory = await couponSchema.findById(couponId);
+            console.log(checkCategory);
             if (checkCategory == undefined || checkCategory == null) {
                 return res.status(404).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: `coupon not found` });
             }
