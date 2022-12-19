@@ -2780,9 +2780,13 @@ router.put('/getPaymentLink', authenticateToken, async (req, res, next) => {
     try {
         const { orderId } = req.body;
         const userId = req.user._id
-        let checkOrder = await invoiceSchema.findOne({ _id: mongoose.Types.ObjectId(orderId), status: 1 });
+        let checkOrder = await invoiceSchema.findOne(orderId);
         if (checkOrder != undefined && checkOrder != null) {
+            if (checkOrder.status != 1) {
+                return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order is not eligible for payment generate' });
+            }
             let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: 2 }, { new: true });
+            updateOrder._doc['link'] = 'https://www.google.com/'
             return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
         }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
