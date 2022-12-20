@@ -985,6 +985,89 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
+router.get('/getRiderCounts', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+
+        const checkUser = await riderSchema.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { riderId: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$riderId", "$$riderId"] }, { $eq: ["$rideType", 0] }, { $eq: ["$status", 2] }] } } }],
+                    as: "pickupComplete"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { riderId: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$riderId", "$$riderId"] }, { $eq: ["$rideType", 1] }, { $eq: ["$status", 2] }] } } }],
+                    as: "deliveryComplete"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { riderId: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$riderId", "$$riderId"] }, { $eq: ["$rideType", 1] }, { $or: [{ $eq: ["$status", 0] }, { $eq: ["$status", 1] }] }] } } }],
+                    as: "deliveryPending"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { riderId: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$riderId", "$$riderId"] }, { $eq: ["$rideType", 0] }, { $or: [{ $eq: ["$status", 0] }, { $eq: ["$status", 1] }] }] } } }],
+                    as: "pickupPending"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { riderId: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$riderId", "$$riderId"] }, { $eq: ["$rideType", 0] }, { $or: [{ $eq: ["$status", 3] }, { $eq: ["$status", 4] }] }] } } }],
+                    as: "pickupCancelled"
+                }
+            },
+            {
+                $lookup: {
+                    from: "pickupdeliveries",
+                    let: { riderId: "$_id" },
+                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ["$riderId", "$$riderId"] }, { $eq: ["$rideType", 1] }, { $or: [{ $eq: ["$status", 3] }, { $eq: ["$status", 4] }] }] } } }],
+                    as: "deliveryCancelled"
+                }
+            },
+            {
+                $project: {
+                    pickupComplete: { $size: "$pickupComplete" },
+                    deliveryComplete: { $size: "$deliveryComplete" },
+                    deliveryPending: { $size: "$deliveryPending" },
+                    pickupPending: { $size: "$pickupPending" },
+                    pickupCancelled: { $size: "$pickupCancelled" },
+                    deliveryCancelled: { $size: "$deliveryCancelled" },
+                }
+            },
+            {
+                $project: {
+                    _id: 0
+                }
+            }
+        ]);
+        if (checkUser.length == 0) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no user details found" });
+
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser[0] }, message: "user details found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.get('/getRiderVehicle', authenticateToken, async (req, res, next) => {
     try {
         const userId = req.user._id;

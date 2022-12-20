@@ -2708,7 +2708,6 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
 
         if (checkOrder != undefined && checkOrder != null) {
             if (checkOrder.status == 1 && (couponCode != undefined && couponCode != null)) {
-                console.log("here");
                 let checkCoupon = await couponSchema.findOne({ name: couponCode, isExpire: false });
                 let amount = checkOrder.finalAmount;
                 let taxes = checkOrder.taxes;

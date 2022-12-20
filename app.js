@@ -10,6 +10,7 @@ var usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const riderRouter = require('./routes/rider');
+const webhook = require('./routes/webhook');
 var app = express();
 const mobileIndex = require('./routes/mobile/index');
 // view engine setup
@@ -25,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+app.use('/hook', webhook);
 app.use('/auth', authRouter);
 app.use('/admin', adminRouter)
 app.use('/rider', riderRouter)
