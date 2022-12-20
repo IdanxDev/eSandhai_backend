@@ -3800,7 +3800,7 @@ router.put('/updateMembershipDetails', authenticateToken, checkUserRole(['superA
             return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
         }
     })
-router.get('/getMembershipDetails', authenticateToken, async (req, res) => {
+router.get('/getMembershipDetails', async (req, res) => {
     try {
         let anotherMatch = [];
         if ('name' in req.query) {
