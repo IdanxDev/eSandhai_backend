@@ -2623,6 +2623,9 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
         if (getOrder == undefined || getOrder == null) {
             return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order details not found' });
         }
+        if (getOrder.status != 0) {
+            let updateOrderStatus = await invoiceSchema.findByIdAndUpdate(orderId, { status: 0, $unset: { couponId: "" }, orderTotalAmount: getOrder.finalAmount, pendingAmount: getOrder.finalAmount }, { new: true });
+        }
         let checkSubscription = await checkUserSubscriptionMember(userId);
         let taxes = await taxSchema.findOne({ isSubscription: checkSubscription[0].isSubscription, isMember: checkSubscription[0].isMember })
         // console.log(taxes);
@@ -2707,20 +2710,20 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
         let checkSubscription = await checkUserSubscriptionMember(userId);
 
         if (checkOrder != undefined && checkOrder != null) {
-            if (checkOrder.status == 1 && (couponCode != undefined && couponCode != null)) {
+            if (couponCode != undefined && couponCode != null) {
                 let checkCoupon = await couponSchema.findOne({ name: couponCode, isExpire: false });
                 let amount = checkOrder.finalAmount;
                 let taxes = checkOrder.taxes;
                 if (checkCoupon != undefined && checkCoupon != null) {
                     if (checkCoupon.minimumAmount != 0 && checkCoupon.minimumAmount > checkCoupon.orderAmount) {
-                        return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon code not applicable' });
+                        return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon code not applicable' });
                     }
                     if (checkCoupon.isOnce == true) {
                         console.log("isonce");
                         let checkCouponExist = await invoiceSchema.findOne({ userId: mongoose.Types.ObjectId(checkOrder.userId), couponId: mongoose.Types.ObjectId(checkCoupon._id), status: { $nin: [11, 0, 12, 1] } });
                         // console.log(checkCoupon);
                         if (checkCouponExist != undefined && checkCouponExist != null) {
-                            return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon already used once' });
+                            return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'coupon already used once' });
                         }
                     }
                     if ('percentage' in checkCoupon && checkCoupon.percentage == true) {
@@ -2737,7 +2740,7 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                 }
                 console.log(taxes);
                 console.log(amount);
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { couponId: checkCoupon._id, orderTotalAmount: amount, taxes: taxes, pendingAmount: amount }, { new: true });
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { couponId: checkCoupon._id, orderTotalAmount: amount, taxes: taxes, pendingAmount: amount, status: 1 }, { new: true });
                 updateOrder._doc['id'] = updateOrder._doc['_id'];
                 delete updateOrder._doc.updatedAt;
                 delete updateOrder._doc.createdAt;
@@ -2748,7 +2751,7 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
             }
             if (status == 1) {
                 if (checkSubscription != undefined && 'isSubscription' in checkSubscription && 'isMember' in checkSubscription && checkSubscription.isSubscription == false && checkSubscription.isMember == false && totalAmount < 15) {
-                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
+                    return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
                 }
             }
 
@@ -2785,10 +2788,10 @@ router.put('/getPaymentLink', authenticateToken, async (req, res, next) => {
             checkOrder = checkOrder._doc;
             if (('pickupTimeId' in checkOrder && checkOrder.pickupTimeId != "") && ('deliveryTimeId' in checkOrder && checkOrder.deliveryTimeId != "") && ('pickupInstruction' in checkOrder && checkOrder.pickupInstruction != "") && ('deliveryInstruction' in checkOrder && checkOrder.deliveryInstruction != "") &&
                 ('pickupAddressId' in checkOrder && checkOrder.pickupAddressId != "") && ('deliveryAddressId' in checkOrder && checkOrder.deliveryAddressId != "")) {
-                if (checkOrder.status != 1) {
+                if (checkOrder.status != 1 && checkOrder.status != 0) {
                     return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order is not eligible for payment generate' });
                 }
-                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: 1 }, { new: true });
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: 2 }, { new: true });
                 updateOrder._doc['link'] = 'https://www.google.com/'
                 return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
             }
