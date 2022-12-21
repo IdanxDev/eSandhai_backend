@@ -2704,7 +2704,7 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
 })
 router.put('/updateOrder', authenticateToken, async (req, res, next) => {
     try {
-        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, status, orderId, paymentId, couponCode, note } = req.body;
+        const { pickupAddressId, deliveryAddressId, deliveryInstruction, pickupInstruction, pickupTimeId, deliveryTimeId, status, orderId, paymentId, couponCode, note } = req.body;
         const userId = req.user._id
         let checkOrder = await invoiceSchema.findById(orderId);
         let checkSubscription = await checkUserSubscriptionMember(userId);
@@ -2761,6 +2761,8 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                 pickupInstruction: pickupInstruction,
                 pickupAddressId: pickupAddressId,
                 deliveryAddressId: deliveryAddressId,
+                pickupTimeId: pickupTimeId,
+                deliveryTimeId: deliveryTimeId,
                 paymentId: paymentId,
                 note: note
             }

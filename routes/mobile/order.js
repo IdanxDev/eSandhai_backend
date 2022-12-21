@@ -192,6 +192,9 @@ router.post('/addOrderItem', authenticateToken, async (req, res, next) => {
         if (getOrder == undefined || getOrder == null) {
             return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order details not found' });
         }
+        if (getOrder.status != 0) {
+            let updateOrderStatus = await invoiceSchema.findByIdAndUpdate(orderId, { status: 0, $unset: { couponId: "" }, orderTotalAmount: getOrder.finalAmount, pendingAmount: getOrder.finalAmount }, { new: true });
+        }
         let checkSubscription = await checkUserSubscriptionMember(userId);
         let taxes = await taxSchema.findOne({ isSubscription: checkSubscription[0].isSubscription, isMember: checkSubscription[0].isMember })
         // console.log(taxes);
