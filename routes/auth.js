@@ -728,7 +728,7 @@ body('otp', 'please pass otp').optional().notEmpty().isString()], checkErr, asyn
             console.log(checkEmail[0]);
             console.log(userId);
             if (checkEmail.length > 0 && checkEmail[0]._id.toString() != userId) {
-                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
+                return res.status(403).json({ issuccess: false, data: { acknowledgement: false, data: null, status: email != undefined && checkEmail[0].email == email ? 0 : 1 }, message: email != undefined && checkEmail[0].email == email ? "email already in use" : "mobile no already in use" });
             }
         }
         let checkUser = await userSchema.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }]);
@@ -2780,14 +2780,21 @@ router.put('/getPaymentLink', authenticateToken, async (req, res, next) => {
     try {
         const { orderId } = req.body;
         const userId = req.user._id
-        let checkOrder = await invoiceSchema.findOne(orderId);
+        let checkOrder = await invoiceSchema.findById(orderId);
         if (checkOrder != undefined && checkOrder != null) {
-            if (checkOrder.status != 1) {
-                return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order is not eligible for payment generate' });
+            checkOrder = checkOrder._doc;
+            if (('pickupTimeId' in checkOrder && checkOrder.pickupTimeId != "") && ('deliveryTimeId' in checkOrder && checkOrder.deliveryTimeId != "") && ('pickupInstruction' in checkOrder && checkOrder.pickupInstruction != "") && ('deliveryInstruction' in checkOrder && checkOrder.deliveryInstruction != "") &&
+                ('pickupAddressId' in checkOrder && checkOrder.pickupAddressId != "") && ('deliveryAddressId' in checkOrder && checkOrder.deliveryAddressId != "")) {
+                if (checkOrder.status != 1) {
+                    return res.status(400).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order is not eligible for payment generate' });
+                }
+                let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: 1 }, { new: true });
+                updateOrder._doc['link'] = 'https://www.google.com/'
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
             }
-            let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: 2 }, { new: true });
-            updateOrder._doc['link'] = 'https://www.google.com/'
-            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+            else {
+                return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order is not eligible for payment generate' });
+            }
         }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order not found' });
     }
