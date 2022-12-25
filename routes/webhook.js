@@ -7,7 +7,7 @@ const stripe = require('stripe')('sk_test_51MGvznGi7bwABort1GkoMw0gP2OhxTaDTPgl0
 //     line_items: [
 //         {
 //             price_data: {
-//                 currency: 'usd',
+//                 currency: 'USD',
 //                 unit_amount: 2000,
 //                 product_data: {
 //                     name: 'T-shirt',

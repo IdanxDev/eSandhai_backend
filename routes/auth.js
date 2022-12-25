@@ -152,7 +152,7 @@ router.post('/signUpWithGoogle', async (req, res, next) => {
         getAuth()
             .verifyIdToken(idToken, checkRevoked)
             .then(async (payload) => {
-                // console.log(payload)
+                console.log(payload)
                 console.log("token is valid in payload")
                 // Token is valid.
                 const { name, email, password, mobileNo, role } = payload;

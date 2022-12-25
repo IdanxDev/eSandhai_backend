@@ -11,7 +11,7 @@ const { check, body, oneOf } = require('express-validator')
 const { main } = require('../../utility/mail')
 const { sendSms } = require('../../utility/sendSms');
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-const { getPlaces, placeFilter, formatAddress } = require('../../utility/mapbox')
+const { getPlaces, placeFilter, formatAddress, distance } = require('../../utility/mapbox')
 const { generateAccessToken, authenticateToken, generateRefreshToken, checkUserRole, authenticateTokenWithUserId } = require('../../middleware/auth');
 const addressSchema = require('../../models/addressSchema');
 const { checkErr } = require('../../utility/error');
@@ -24,6 +24,7 @@ const pickupDeliverySchema = require('../../models/pickupDeliverySchema');
 const invoiceSchema = require('../../models/invoiceSchema');
 const proofSchema = require('../../models/proofSchema');
 const { getDateArray } = require('../../utility/expiration');
+const { pipeline } = require('nodemailer/lib/xoauth2');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -981,6 +982,87 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
 
         }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: checkUser[0] }, message: "user details found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getLatLongs', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        const { lat, long } = req.query;
+
+        const checkUser = await pickupDeliverySchema.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { riderId: mongoose.Types.ObjectId(userId) },
+                        { status: { $in: [0, 1] } }
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: "invoices",
+                    let: { id: "$orderId", rideType: "$rideType" },
+                    pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$id"] } } },
+                    {
+                        $lookup: {
+                            from: "addresses",
+                            let: { addressId: "$pickupAddressId" },
+                            pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
+                                $project: {
+                                    _id: 0,
+                                    __v: 0
+                                }
+                            }],
+                            as: "pickupAddress"
+                        }
+                    }, {
+                        $lookup: {
+                            from: "addresses",
+                            let: { addressId: "$deliveryAddressId" },
+                            pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$addressId"] } } }, { $addFields: { id: "$_id" } }, {
+                                $project: {
+                                    _id: 0,
+                                    __v: 0
+                                }
+                            }],
+                            as: "deliveryAddress"
+                        }
+                    },
+                    {
+                        $addFields: {
+                            targetAddress: {
+                                $switch: {
+                                    branches: [
+                                        {
+                                            case: { $eq: ["$$rideType", 0] }, then: "$pickupAddress"
+                                        },
+                                        { case: { $eq: ["$$rideType", 1] }, then: "$deliveryAddress" }
+                                    ],
+                                    default: []
+                                }
+                            }
+                        }
+                    }],
+                    as: "invoiceData"
+                }
+            }
+        ]);
+        let arr = []
+        for (i = 0; i < checkUser.length; i++) {
+            if (checkUser[i].invoiceData.length > 0 && checkUser[i].invoiceData[0].targetAddress.length > 0) {
+                let checkDistance = await distance(lat, long, checkUser[i].invoiceData[0].targetAddress[0].lat, checkUser[i].invoiceData[0].targetAddress[0].long)
+                console.log(checkDistance);
+                let obj = Object.assign(checkUser[i].invoiceData[0].targetAddress[0], { rideType: checkUser[i].rideType, status: checkUser[i].rideType, distance: checkDistance });
+                arr.push(obj)
+            }
+        }
+        if (arr.length == 0) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no user ride details found" });
+        }
+        arr.sort((a, b) => a.distance - b.distance);
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: arr }, message: "ride details found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
