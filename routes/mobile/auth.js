@@ -12,6 +12,7 @@ const { check, body, oneOf } = require('express-validator')
 const { main } = require('../../utility/mail')
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const { sendSms } = require('../../utility/sendSms');
+const admin = require('../../utility/setup/firebase-admin');
 const { getPlaces, placeFilter, formatAddress } = require('../../utility/mapbox')
 const { generateAccessToken, authenticateToken, generateRefreshToken } = require('../../middleware/authMobile');
 const addressSchema = require('../../models/addressSchema');
@@ -25,6 +26,7 @@ const contactUsSchema = require('../../models/contactUsSchema');
 const dayWiseSchema = require('../../models/dayWiseSchema');
 const membershipDetails = require('../../models/membershipDetails');
 const membershipSchema = require('../../models/membershipSchema');
+const { getAuth, UserRecord } = require('firebase-admin/auth');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -111,14 +113,90 @@ router.post('/contactUs',
 router.post('/signUpWithGoogle', async (req, res, next) => {
     try {
         // console.log(req.body)
-        const { idToken } = req.body;
-        if (idToken == undefined) {
+        const { uid } = req.body;
+        // getAuth().getUser(uid).then((userRecord) => {
+        //     console.log(userRecord);
+        // }).catch((error) => {
+        //     console.log('Error fetching user data:', error);
+        // });
+        if (uid == undefined) {
             return res.status(401).json({ issuccess: false, data: null, message: "please check id token in request" });
         }
         await new bodySchema({
-            token: idToken
+            token: uid
         }).save()
-        return res.status(200).json({ issuccess: true, data: null, message: "done" });
+
+        let checkRevoked = true;
+        getAuth()
+            .getUser(uid)
+            .then(async (payload) => {
+                console.log(payload.providerData[0].email);
+                console.log(typeof payload.providerData);
+                console.log("token is valid in payload")
+                // Token is valid.
+                const { email } = payload.providerData[0];
+                const name = payload.providerData[0].displayName
+                // console.log(email.toString())
+                let checkExist = await userSchema.aggregate([
+                    {
+                        $match: {
+                            email: email
+                        }
+                    }
+                ]);
+                // console.log(checkExist);
+                if (checkExist.length > 0) {
+                    let user = {
+                        _id: checkExist[0]._id,
+                        timestamp: Date.now()
+                    }
+
+                    const { generatedToken, refreshToken } = await generateAccessToken(user);
+                    return res.status(200).json({ issuccess: true, data: { user: { email: checkExist[0].email, name: checkExist[0].name, id: checkExist[0]._id, role: checkExist[0].role }, token: generatedToken, refreshToken: refreshToken }, message: "user successully found" });
+                }
+
+                // const userLoginIs = new userLogin({
+                //   userName: userName,
+                //   password: password
+                // });
+
+                // await userLoginIs.save();
+
+                const userIs = new userSchema({
+                    name: name,
+                    email: email
+                });
+
+                await userIs.save();
+                // console.log(userIs)
+                let user = {
+                    _id: userIs._id,
+                    role: "user",
+                    timestamp: Date.now()
+                }
+                const { generatedToken, refreshToken } = await generateAccessToken(user);
+                return res.status(200).json({
+                    issuccess: true, data: {
+                        user: {
+                            email: userIs.email, name: userIs.name, id: userIs._id, role: userIs.role
+                        }, token: generatedToken, refreshToken: refreshToken
+                    }, message: "user successfully signed up"
+                });
+            })
+            .catch((error) => {
+                console.log(error.message)
+                if (error.code == 'auth/id-token-revoked') {
+                    console.log("token is revoked")
+                    return res.status(401).json({ issuccess: false, data: null, message: "user revoked app permissions" });
+                    // Token has been revoked   . Inform the user to reauthenticate or signOut() the user.
+                } else {
+                    console.log("token is invalid")
+                    return res.status(401).json({ issuccess: false, data: null, message: "invalid token" });
+                    // Token is invalid.
+                }
+            });
+
+
 
         // return res.status(200).json({ issuccess: true, data: null, message: "done" });
         // let checkRevoked = true;
@@ -1073,7 +1151,7 @@ router.get('/getSuggestions', async (req, res, next) => {
         // const userId = req.user._id
         const { text } = req.query;
         // console.log(req.user._id);
-        let places = await getPlaces(text,10);
+        let places = await getPlaces(text, 10);
         let filterPlace = await placeFilter(places)
         return res.status(filterPlace.length > 0 ? 200 : 200).json({ issuccess: filterPlace.length > 0 ? true : false, data: { acknowledgement: true, data: filterPlace.length > 0 ? filterPlace : [] }, message: filterPlace.length > 0 ? "places details found" : "no any place found" });
     } catch (error) {

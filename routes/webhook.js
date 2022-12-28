@@ -10,7 +10,7 @@ const stripe = require('stripe')('sk_test_51MGvznGi7bwABort1GkoMw0gP2OhxTaDTPgl0
 //                 currency: 'USD',
 //                 unit_amount: 2000,
 //                 product_data: {
-//                     name: 'T-shirt',
+//                     name: 'Deluxe Cleaners ',
 //                     description: 'Comfortable cotton t-shirt',
 //                     images: ['https://example.com/t-shirt.png'],
 //                 },
