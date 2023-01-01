@@ -26,6 +26,24 @@ exports.distance = async (lat1,
     // calculate the result
     return (c * r);
 }
+exports.getLatLong = (keyword, limit) => {
+    var config = {
+        method: 'get',
+        url: `https://api.mapbox.com/geocoding/v5/mapbox.places/${keyword}.json?types=place%2Cpostcode%2Caddress%2Ccountry%2Cregion%2Cdistrict%2Clocality%2Cneighborhood%2Cpoi&language=en&limit=1&access_token=${process.env.MAPBOX_TOKEN}`,
+        headers: {}
+    };
+    console.log(`https://api.mapbox.com/geocoding/v5/mapbox.places/${keyword}.json?types=place%2Cpostcode%2Caddress%2Ccountry%2Cregion%2Cdistrict%2Clocality%2Cneighborhood%2Cpoi&language=en&limit=1&access_token=${process.env.MAPBOX_TOKEN}`)
+    return new Promise((resolve, reject) => {
+        axios(config)
+            .then(function (response) {
+                resolve(response.data)
+            })
+            .catch(function (error) {
+                reject(error)
+                console.log(error);
+            });
+    });
+}
 exports.getPlaces = (keyword, limit) => {
     var config = {
         method: 'get',

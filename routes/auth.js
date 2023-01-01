@@ -15,7 +15,7 @@ const { getAuth } = require("firebase-admin/auth");
 const { check, body, oneOf } = require('express-validator')
 const { main } = require('../utility/mail')
 const { sendSms } = require('../utility/sendSms');
-const { getPlaces, placeFilter, formatAddress } = require('../utility/mapbox')
+const { getPlaces, placeFilter, formatAddress, getLatLong } = require('../utility/mapbox')
 const { generateAccessToken, authenticateToken, generateRefreshToken, checkUserRole } = require('../middleware/auth');
 const addressSchema = require('../models/addressSchema');
 const { checkErr } = require('../utility/error');
@@ -1893,7 +1893,7 @@ router.get('/getPlace', async (req, res, next) => {
         // const userId = req.user._id
         const { lat, long } = req.query;
         // console.log(req.user._id);
-        let places = await getPlaces(`${long},${lat}`, 1);
+        let places = await getLatLong(`${long},${lat}`, 1);
         // return res.json(places)
         let filterPlace = await formatAddress(places)
         return res.status(200).json({ issuccess: true, data: { acknowledgement: Object.keys(filterPlace).length > 0 ? true : false, data: Object.keys(filterPlace).length > 0 ? filterPlace : filterPlace }, message: Object.keys(filterPlace).length > 0 ? "address found" : "address not recognized" });
