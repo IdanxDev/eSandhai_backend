@@ -9,7 +9,7 @@ const userSchema = require('../../models/userModel');
 const { getCurrentDateTime24, makeid } = require('../../utility/dates');
 const nodemailer = require("nodemailer");
 const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember, getDateArray, nextDays } = require('../../utility/expiration');
+const { checkExpireSubscription, checkExpireMemberShip, checkUserSubscriptionMember, getDateArray, nextDays, getStatus } = require('../../utility/expiration');
 const { generateAccessToken, authenticateToken, generateRefreshToken, checkUserRole } = require('../../middleware/auth');
 const taxSchema = require('../../models/taxSchema')
 const invoiceSchema = require('../../models/invoiceSchema');
@@ -802,6 +802,41 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
             }
         ])
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: orderId != undefined && getUsers.length > 0 ? getUsers[0] : getUsers }, message: getUsers.length > 0 ? `invoice order found` : "no any invoice orders found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getProcessOrder', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        let orders = await invoiceSchema.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { status: { $nin: [0, 1, 11, 12, 13] } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ])
+        for (i = 0; i < orders.length; i++) {
+            let orderStatus = getStatus(orders[i].status);
+            orders[i]['orderStatus'] = orderStatus
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: orders }, message: orders.length > 0 ? `invoice order found` : "no any invoice orders found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

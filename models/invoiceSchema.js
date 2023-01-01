@@ -43,6 +43,9 @@ const invoiceSchema = mongoose.Schema({
     //8==delivery intiated
     //9==delivery failed
     //10==delivery completed& order completed
+    //11==cancelled
+    //12==refund initiated
+    //13==refund completed
     status: {
         type: Number,
         default: 0

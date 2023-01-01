@@ -166,6 +166,57 @@ exports.getNextNextDays = (start) => {
     }
     return arr;
 }
+exports.getStatus = (status) => {
+    switch (status) {
+        case 0:
+            return "Item Selection"
+            // code block
+            break;
+        case 1:
+            return "Pending Payment"
+            // code block
+            break;
+        case 2:
+            return "Pending Pickup"
+            break;
+        case 3:
+            return "Pickup Initiated"
+            break;
+        case 4:
+            return "Pickup Failed"
+            break;
+        case 5:
+            return "Pickup Completed"
+            break;
+        case 6:
+            return "Processing Your Clothes"
+            break;
+        case 7:
+            return "Cleaning Completed"
+            break;
+        case 8:
+            return "Delivery Initiated"
+            break;
+        case 9:
+            return "Pickup Failed"
+            break;
+        case 10:
+            return "Order Completed"
+            break;
+        case 11:
+            return "Order Cancelled"
+            break;
+        case 12:
+            return "Order Cancelled And Refund Pending"
+            break;
+        case 13:
+            return "Refund Processed"
+            break;
+        default:
+            return "No any order status found"
+        // code block
+    }
+}
 exports.checkUserSubscriptionMember = async (userId) => {
     let checkUser = await userModel.aggregate([{ $match: { _id: mongoose.Types.ObjectId(userId) } }, {
         $lookup: {
