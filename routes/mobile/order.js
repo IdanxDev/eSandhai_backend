@@ -17,6 +17,9 @@ const orderItems = require('../../models/orderItems');
 const itemSchema = require('../../models/itemSchema');
 const dayWiseSchema = require('../../models/dayWiseSchema');
 const couponSchema = require('../../models/couponSchema');
+const orderState = require('../../models/orderState');
+const { check } = require('express-validator');
+const { checkErr } = require('../../utility/error');
 router.post('/addOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupTimeId, deliveryTimeId, pickupInstruction, deliveryInstruction, pickupAddressId, deliveryAddressId, items } = req.body;
@@ -837,6 +840,74 @@ router.get('/getProcessOrder', authenticateToken, async (req, res) => {
             orders[i]['orderStatus'] = orderStatus
         }
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: orders }, message: orders.length > 0 ? `invoice order found` : "no any invoice orders found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getCancelledOrder', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        console.log(userId);
+        let orders = await invoiceSchema.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { status: { $in: [11, 12, 13] } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    id: "$_id"
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ])
+        for (i = 0; i < orders.length; i++) {
+            let orderStatus = getStatus(orders[i].status);
+            orders[i]['orderStatus'] = orderStatus
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: orders }, message: orders.length > 0 ? `invoice order found` : "no any invoice orders found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.post('/getOrderState', authenticateToken, [check('orderId', 'please pass valid orderId').custom(value => { return mongoose.Types.ObjectId.isValid(value) })], checkErr, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { orderId } = req.body
+        let orders = await orderState.aggregate([
+            {
+                $match: {
+                    orderId: mongoose.Types.ObjectId(orderId)
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $dateToString: { format: "%d-%m-%Y %H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAt: { $dateToString: { format: "%d-%m-%Y %H:%M:%S", date: "$updatedAt", timezone: "-04:00" } }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ])
+        for (i = 0; i < orders.length; i++) {
+            let orderStatus = getStatus(orders[i].to);
+            orders[i]['orderStatus'] = orderStatus
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: orders }, message: orders.length > 0 ? `order states found` : "no any state found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

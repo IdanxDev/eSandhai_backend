@@ -11,6 +11,7 @@ const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const riderRouter = require('./routes/rider');
 const webhook = require('./routes/webhook');
+require('./routes/watcher')
 var app = express();
 const mobileIndex = require('./routes/mobile/index');
 // view engine setup
