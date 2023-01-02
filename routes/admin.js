@@ -2217,7 +2217,7 @@ router.put('/updateBanner', authenticateToken, checkUserRole(['superAdmin', 'adm
 
         if (req.file != undefined) {
             let result = checkCategory.banner.indexOf("banner");
-            let key = checkCategory.banner.substring(result, checkCategory.icon.length)
+            let key = checkCategory.banner.substring(result, checkCategory.banner.length)
             if (key != undefined) {
                 removeObject(key)
             }
@@ -2235,7 +2235,18 @@ router.put('/updateBanner', authenticateToken, checkUserRole(['superAdmin', 'adm
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
-
+router.delete('/removeBanner', authenticateToken, async (req, res) => {
+    try {
+        const { bannerId } = req.body;
+        let removeHelper = await bannerSchema.findByIdAndRemove(bannerId);
+        if (removeHelper != undefined && removeHelper != null) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: removeHelper }, message: "banner data not found" });
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: removeHelper }, message: "banner removed successfully" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
 router.post('/addTimerange', authenticateToken, checkUserRole(['superAdmin']),
     [body("start", "please provide start hours").notEmpty().isString().custom((value) => { return /^(\d{1,2})\:(\d{1,2})$/.test(value) }),
     body('end', "please provide ending hours").notEmpty().isString().custom((value) => { return /^(\d{1,2})\:(\d{1,2})$/.test(value) }),
@@ -3186,6 +3197,18 @@ router.get('/getHelper', authenticateToken, async (req, res) => {
             }
         ])
         return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: getUsers }, message: getUsers.length > 0 ? `category helper found` : "no category helper found" });
+    } catch (error) {
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.delete('/removeHelper', authenticateToken, async (req, res) => {
+    try {
+        const { helperId } = req.body;
+        let removeHelper = await helperSchema.findByIdAndRemove(helperId);
+        if (removeHelper != undefined && removeHelper != null) {
+            return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: removeHelper }, message: "helper data not found" });
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: removeHelper }, message: "helper removed successfully" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
