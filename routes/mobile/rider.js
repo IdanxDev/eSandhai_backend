@@ -1062,7 +1062,12 @@ router.get('/getLatLongs', authenticateToken, async (req, res, next) => {
             return res.status(404).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no user ride details found" });
         }
         arr.sort((a, b) => a.distance - b.distance);
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: arr }, message: "ride details found" });
+        let url = `https://www.google.com/maps/dir/${lat},${long}`
+        for (i = 0; i < arr.length; i++) {
+            console.log(arr[i].lat + "  " + arr[i].long);
+            url += `/${arr[i].lat},${arr[i].long}`
+        }
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: { url: url, orderData: arr } }, message: "ride details found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }

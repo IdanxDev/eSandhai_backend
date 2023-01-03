@@ -20,6 +20,7 @@ const couponSchema = require('../../models/couponSchema');
 const orderState = require('../../models/orderState');
 const { check } = require('express-validator');
 const { checkErr } = require('../../utility/error');
+const refundRequest = require('../../models/refundRequest');
 router.post('/addOrder', authenticateToken, async (req, res, next) => {
     try {
         const { pickupTimeId, deliveryTimeId, pickupInstruction, deliveryInstruction, pickupAddressId, deliveryAddressId, items } = req.body;
@@ -320,6 +321,23 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                 if (checkSubscription != undefined && 'isSubscription' in checkSubscription && 'isMember' in checkSubscription && checkSubscription.isSubscription == false && checkSubscription.isMember == false && totalAmount < 15) {
                     return res.status(400).json({ issuccess: true, data: { acknowledgement: false, data: null }, message: 'order should be with minimum 15$' });
                 }
+            }
+            if (status == 11) {
+                if ([2, 3, 4].includes(checkOrder.status) && checkOrder.paymentId.length > 0) {
+                    let addRefund = refundRequest({ orderId: checkOrder._id, userId: checkOrder.userId, cancellationTime: new Date(), paymentId: checkOrder.paymentId[0] })
+                    await addRefund.save();
+                    let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { status: 12 }, { new: true });
+                    updateOrder._doc['id'] = updateOrder._doc['_id'];
+                    delete updateOrder._doc.updatedAt;
+                    delete updateOrder._doc.createdAt;
+                    delete updateOrder._doc._id;
+                    delete updateOrder._doc.__v;
+                    return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+                }
+                else {
+                    return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: 'order is not eligible for cancellation' });
+                }
+
             }
             let update = {
                 status: status,
