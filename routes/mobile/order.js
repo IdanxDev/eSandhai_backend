@@ -835,7 +835,7 @@ router.get('/getProcessOrder', authenticateToken, async (req, res) => {
                 $match: {
                     $and: [
                         { userId: mongoose.Types.ObjectId(userId) },
-                        { status: { $nin: [0, 1, 11, 12, 13] } }
+                        { status: { $nin: [0, 1, 10, 11, 12, 13] } }
                     ]
                 }
             },

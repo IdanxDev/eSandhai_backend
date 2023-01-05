@@ -844,14 +844,14 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
         let getPendingOrder = await invoiceSchema.aggregate([
             {
                 $match: {
-                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 0 }]
+                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: { $in: [2, 3, 4] } }]
                 }
             }
         ])
         let getCompletedOrder = await invoiceSchema.aggregate([
             {
                 $match: {
-                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: 3 }]
+                    $and: [{ userId: mongoose.Types.ObjectId(userId) }, { status: { $in: [5, 6, 7, 8, 9] } }]
                 }
             }
         ])
