@@ -300,21 +300,23 @@ router.put('/updateOrder', authenticateToken, async (req, res, next) => {
                     }
                     if ('percentage' in checkCoupon && checkCoupon.percentage == true) {
                         amount = amount - ((checkCoupon.discount / 100) * amount)
-                        taxes['discount'] = ((checkCoupon.discount / 100) * amount)
+                        taxes.set('discount', ((checkCoupon.discount / 100) * amount))
+                        // console.log(((checkCoupon.discount / 100) * amount) + "");
                     }
                     else {
                         amount = amount - checkCoupon.discount;
-                        taxes['discount'] = checkCoupon.discount
+                        taxes.set('discount', checkCoupon.discount)
+                        // console.log(checkCoupon.discount);
                     }
                 }
-                console.log(amount);
+                console.log(taxes);
                 let updateOrder = await invoiceSchema.findByIdAndUpdate(orderId, { couponId: couponId, orderTotalAmount: amount, taxes: taxes, pendingAmount: amount }, { new: true });
                 updateOrder._doc['id'] = updateOrder._doc['_id'];
                 delete updateOrder._doc.updatedAt;
                 delete updateOrder._doc.createdAt;
                 delete updateOrder._doc._id;
                 delete updateOrder._doc.__v;
-                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'order updated' });
+                return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: updateOrder }, message: 'coupon applied' });
 
             }
             if (status == 1) {
