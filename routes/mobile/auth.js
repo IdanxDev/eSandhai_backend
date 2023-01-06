@@ -370,6 +370,9 @@ router.post('/login', [oneOf([body('id').isEmail().withMessage("please pass emai
         ]);
 
         if (checkExist.length > 0) {
+            if (!('password' in checkExist[0])) {
+                return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 4 }, message: "sign in with google please" });
+            }
             if (!(await bcrypt.compare(password, checkExist[0].password))) {
                 return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null, status: 1 }, message: "Incorrect Password" });
             }
