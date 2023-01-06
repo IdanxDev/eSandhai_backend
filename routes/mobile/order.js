@@ -628,11 +628,17 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
             }
         }
         let getUsers = await invoiceSchema.aggregate([
-            { $match: { userId: mongoose.Types.ObjectId(userId) } },
-            match,
             {
-                status: { $nin: [0, 1] }
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        {
+                            status: { $nin: [0, 1] }
+                        }
+                    ]
+                }
             },
+            match,
             {
                 $addFields: {
                     id: "$_id"
