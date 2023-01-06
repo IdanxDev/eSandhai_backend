@@ -38,7 +38,7 @@ router.post('/addOrder', authenticateToken, async (req, res, next) => {
             console.log("items");
             for (i = 0; i < items.length; i++) {
                 console.log();
-                let amount = getItems.find((item) => { if (item._id.toString() == items[i].itemId.toString()) { return item.price } return {} })
+                let amount = getItems.find((item) => { if (item._id.toString() == items[i].itemId.toString()) { return item.price } })
                 console.log(amount.price);
                 if (amount != undefined) {
                     totalAmount += (amount.price * items[i].qty);
