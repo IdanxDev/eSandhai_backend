@@ -631,6 +631,9 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
             { $match: { userId: mongoose.Types.ObjectId(userId) } },
             match,
             {
+                status: { $nin: [0, 1] }
+            },
+            {
                 $addFields: {
                     id: "$_id"
                 }

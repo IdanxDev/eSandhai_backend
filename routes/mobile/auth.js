@@ -812,7 +812,7 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
 })
 router.get('/getProfile', authenticateToken, async (req, res, next) => {
     try {
-        const userId = req.user._id
+        const userId = req.query.userId
         console.log(req.user._id);
         const checkUser = await userSchema.aggregate([
             {
@@ -856,7 +856,124 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
             }
         ])
         let getSubscriptionDetail = await checkUserSubscriptionMember(userId)
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign({ pendingPickups: getPendingOrder.length, pendingDelivery: getCompletedOrder.length }, checkUser[0], { isSubscription: getSubscriptionDetail[0].isSubscription, isMember: getSubscriptionDetail[0].isMember }) }, message: "user details found" });
+        let getAddress = await userSubscription.aggregate([
+            {
+                $match: {
+                    $and: [
+                        { userId: mongoose.Types.ObjectId(userId) },
+                        { status: 1 }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    "id": "$_id",
+                    "validity": {
+                        $switch: {
+                            branches: [
+                                {
+                                    case: { $eq: ["$duration", 0] }, then: "1 month validity"
+                                },
+                                { case: { $eq: ["$duration", 1] }, then: "6 month validity" },
+                                { case: { $eq: ["$duration", 2] }, then: "1 year validity" },
+                            ],
+                            default: "no any plan"
+                        }
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: "subscriptions",
+                    let: { id: "$planId" },
+                    pipeline: [{
+                        $match: {
+                            $expr: {
+                                $eq: ["$_id", "$$id"]
+                            }
+                        }
+                    },
+                    {
+                        $addFields: {
+                            "id": "$_id"
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            __v: 0,
+                            isVisible: 0,
+                            createdAt: 0,
+                            updatedAt: 0
+                        }
+                    }],
+                    as: "planDetails"
+                }
+            },
+
+            {
+                $addFields: {
+                    createdAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtDate: { $dateToString: { format: "%d-%m-%Y", date: "$updatedAt", timezone: "-04:00" } },
+                    createdAtTime: { $dateToString: { format: "%H:%M:%S", date: "$createdAt", timezone: "-04:00" } },
+                    updatedAtTime: { $dateToString: { format: "%H:%M:%S", date: "$updatedAt", timezone: "-04:00" } },
+                }
+            },
+            {
+                $addFields: {
+                    createdAt: { $concat: ["$createdAtDate", " ", "$createdAtTime"] },
+                    updatedAt: { $concat: ["$updatedAtDate", " ", "$updatedAtTime"] }
+                }
+            },
+            {
+                $addFields: {
+                    planDetails: { $first: "$planDetails" }
+                }
+            },
+            {
+                $sort: { "createdAt": -1 }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    __v: 0
+                }
+            }
+        ]);
+        let validityPlan = 0;
+        let totalPickup = 0;
+        let leftPickup = 0;
+        let pickupPercentage = 0;
+        let deliveryPercentage = 0;
+        let dayPercentage = 0
+        let pendingDays = 0
+        if (getAddress.length > 0) {
+            leftPickup = getAddress[0].pickup
+            let delivery = getAddress[0].delivery
+            totalPickup = getAddress[0].planDetails.pickup
+            let useddelivery = getAddress[0].planDetails.delivery
+            pickupPercentage = (leftPickup * 100) / totalPickup
+            deliveryPercentage = (delivery * 100) / useddelivery
+            pendingDays = getAddress[0].pendingDays
+            validityPlan = getAddress[0].validity
+            let totalDays = (getAddress[0].duration == 0 ? 28 : ((getAddress[0].duration == 1) ? (28 * 6) : 365))
+            dayPercentage = (pendingDays * 100) / totalDays
+            leftPickup += (getAddress[0].duration == 0 ? " bag" : ((getAddress[0].duration == 1) ? " bag" : " bag"))
+            totalPickup += (getAddress[0].duration == 0 ? " bag monthly" : ((getAddress[0].duration == 1) ? " bag quartly" : " bag yearly"))
+        }
+        return res.status(200).json({
+            issuccess: true, data: {
+                acknowledgement: true, data: Object.assign({ pendingPickups: getPendingOrder.length, pendingDelivery: getCompletedOrder.length }, checkUser[0], {
+                    validityPlan: validityPlan,
+                    totalPickup: totalPickup,
+                    leftPickup: leftPickup,
+                    pickupPercentage: pickupPercentage,
+                    deliveryPercentage: deliveryPercentage,
+                    dayPercentage: dayPercentage,
+                    pendingDays: pendingDays,
+                }, { isSubscription: getSubscriptionDetail[0].isSubscription, isMember: getSubscriptionDetail[0].isMember })
+            }, message: "user details found"
+        });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
