@@ -815,7 +815,7 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
 })
 router.get('/getProfile', authenticateToken, async (req, res, next) => {
     try {
-        const userId = req.query.userId
+        const userId = req.user._id
         console.log(req.user._id);
         const checkUser = await userSchema.aggregate([
             {
