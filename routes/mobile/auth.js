@@ -815,7 +815,7 @@ router.get('/getDeluxMembership', authenticateToken, async (req, res, next) => {
 })
 router.get('/getProfile', authenticateToken, async (req, res, next) => {
     try {
-        const userId = req.user._id
+        const userId = req.query.userId
         console.log(req.user._id);
         const checkUser = await userSchema.aggregate([
             {
@@ -842,7 +842,6 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
         ]);
         if (checkUser.length == 0) {
             return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: null }, message: "no user details found" });
-
         }
         let getPendingOrder = await invoiceSchema.aggregate([
             {
@@ -943,9 +942,9 @@ router.get('/getProfile', authenticateToken, async (req, res, next) => {
                 }
             }
         ]);
-        let validityPlan = 0;
-        let totalPickup = 0;
-        let leftPickup = 0;
+        let validityPlan = "no any plan";
+        let totalPickup = "no any pickup you have";
+        let leftPickup = "no any pickup left";
         let pickupPercentage = 0;
         let deliveryPercentage = 0;
         let dayPercentage = 0
