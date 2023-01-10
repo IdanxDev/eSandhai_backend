@@ -2464,11 +2464,14 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body('discount', "please provide discount value").notEmpty().isNumeric(),
     body('minimumAmount', "please provide minimum amount").notEmpty().isNumeric(),
     body('isOnce', "please provide valid isOnce").optional().isBoolean(),
+    body('isSpecial', "please provide valid isSpecial").optional().isBoolean(),
+    body('isNewOnly', "please provide valid isNewOnly").optional().isBoolean(),
+    body('isExist', "please provide valid isExist").optional().isBoolean(),
     body('percentage', "please provide valid percentage").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
     ], checkErr, async (req, res) => {
         try {
-            let { name, description, start, discount, end, isOnce, percentage, minimumAmount, isVisible, terms } = req.body;
+            let { name, description, start, discount, end, isOnce, isSpecial, isNewOnly, isExist, percentage, minimumAmount, isVisible, terms } = req.body;
 
             let checkCategory = await couponSchema.findOne({ name: name });
 
@@ -2486,6 +2489,9 @@ router.post('/addCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 description: description,
                 start: startIs,
                 end: endIs,
+                isSpecial: isSpecial,
+                isExist: isExist,
+                isNewOnly: isNewOnly,
                 minimumAmount: minimumAmount,
                 percentage: percentage,
                 discount: discount,
@@ -2511,6 +2517,9 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     body("start", "please provide start hours").optional().notEmpty().isString(),
     body('end', "please provide ending hours").optional().notEmpty().isString(),
     body('isOnce', "please provide valid isOnce").optional().isBoolean(),
+    body('isSpecial', "please provide valid isSpecial").optional().isBoolean(),
+    body('isNewOnly', "please provide valid isNewOnly").optional().isBoolean(),
+    body('isExist', "please provide valid isExist").optional().isBoolean(),
     body('minimumAmount', "please provide minimum amount").optional().notEmpty().isNumeric(),
     body('percentage', "please provide valid percentage").optional().isBoolean(),
     body('isVisible', "please provide valid visibility status field").optional().isBoolean(),
@@ -2518,7 +2527,7 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
     ], checkErr, checkErr, async (req, res) => {
         try {
             const { name,
-                description, terms, discount, start, end, isOnce, isVisible, minimumAmount, percentage, couponId } = req.body;
+                description, terms, discount, start, end, isOnce, isSpecial, isNewOnly, isExist, isVisible, minimumAmount, percentage, couponId } = req.body;
             console.log(couponId);
             let checkCategory = await couponSchema.findById(couponId);
             console.log(checkCategory);
@@ -2538,6 +2547,9 @@ router.put('/updateCoupon', authenticateToken, checkUserRole(['superAdmin']),
                 description: description,
                 terms: terms,
                 isOnce: isOnce,
+                isExist: isExist,
+                isNewOnly: isNewOnly,
+                isSpecial: isSpecial,
                 minimumAmount: minimumAmount,
                 percentage: percentage,
                 start: startIs,
@@ -2573,6 +2585,15 @@ router.get('/getCoupons', authenticateToken, async (req, res) => {
         }
         if ('isOnce' in req.query) {
             anotherMatch.push({ isOnce: req.query.isOnce === 'true' })
+        }
+        if ('isSpecial' in req.query) {
+            anotherMatch.push({ isSpecial: req.query.isSpecial === 'true' })
+        }
+        if ('isExist' in req.query) {
+            anotherMatch.push({ isExist: req.query.isExist === 'true' })
+        }
+        if ('isNewOnly' in req.query) {
+            anotherMatch.push({ isNewOnly: req.query.isNewOnly === 'true' })
         }
         if ('date' in req.query) {
             let dateIs = moment(req.query.date + " 00:00:00", "DD-MM-YYYY hh:mm:ss")
