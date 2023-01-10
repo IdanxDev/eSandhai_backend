@@ -34,6 +34,18 @@ const couponSchema = mongoose.Schema({
         type: Boolean,
         default: false
     },
+    isExist: {
+        type: Boolean,
+        default: false
+    },
+    isNewOnly: {
+        type: Boolean,
+        default: false
+    },
+    isSpecial: {
+        type: Boolean,
+        default: false
+    },
     minimumAmount: {
         type: Number,
         default: 0

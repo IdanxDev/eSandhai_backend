@@ -27,6 +27,10 @@ const dayWiseSchema = require('../../models/dayWiseSchema');
 const membershipDetails = require('../../models/membershipDetails');
 const membershipSchema = require('../../models/membershipSchema');
 const { getAuth, UserRecord } = require('firebase-admin/auth');
+const userRefer = require('../../models/userRefer');
+const referred = require('../../models/referred');
+const couponSchema = require('../../models/couponSchema');
+const couponUsers = require('../../models/couponUsers');
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     console.log(validatePhoneNumber("9999999999"));
@@ -35,7 +39,7 @@ router.get('/', async function (req, res, next) {
 });
 router.post('/signUp', [body('email').isEmail().withMessage("please pass email id"), body('password').not().isEmpty().isString().withMessage("please pass password")], checkErr, async (req, res, next) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, referralCode } = req.body;
 
         let checkExist = await userSchema.aggregate([
             {
@@ -57,14 +61,22 @@ router.post('/signUp', [body('email').isEmail().withMessage("please pass email i
         // });
 
         // await userLoginIs.save();
-
         const userIs = new userSchema({
             email: email,
             password: password
         });
 
         await userIs.save();
-
+        let referral = makeid(6)
+        await new userRefer({ referral: referral, userId: userIs._id }).save();
+        if (referralCode != undefined) {
+            let getReferral = await userRefer.findOne({ referral: referralCode })
+            await new referred({ referredBy: getReferral.userId, referredTo: userIs._id });
+            let getCoupons = await couponSchema.aggregate([{ $match: { $and: [{ isSpecial: true }, { isExpired: false }] } }])
+            for (i = 0; i < getCoupons.length; i++) {
+                await new couponUsers({ couponId: getCoupons[i]._id, userId: userIs._id })
+            }
+        }
         otp = getRandomIntInclusive(111111, 999999);
 
         console.log(otp);
@@ -742,6 +754,18 @@ router.get('/getNotifications', authenticateToken, async (req, res, next) => {
 
     } catch (error) {
         console.log(error.message);
+        return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
+    }
+})
+router.get('/getReferral', authenticateToken, async (req, res, next) => {
+    try {
+        const userId = req.user._id
+        let getReferral = await userRefer.findOne({ userId: mongoose.Types.ObjectId(userId) });
+        if (getReferral != undefined && getReferral != null) {
+            return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: Object.assign({ link: "https://www.google.com/", referral: getReferral.referral }) }, message: "referral details found" });
+        }
+        return res.status(200).json({ issuccess: false, data: { acknowledgement: false, data: {} }, message: "no details found" });
+    } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
 })
