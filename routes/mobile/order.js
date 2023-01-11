@@ -833,7 +833,7 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
                 }
             }
         ])
-        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: orderId != undefined && getUsers.length > 0 ? getUsers[0] : [] }, message: getUsers.length > 0 ? `invoice order found` : "no any invoice orders found" });
+        return res.status(200).json({ issuccess: true, data: { acknowledgement: true, data: orderId != undefined && getUsers.length > 0 ? getUsers[0] : getUsers }, message: getUsers.length > 0 ? `invoice order found` : "no any invoice orders found" });
     } catch (error) {
         return res.status(500).json({ issuccess: false, data: { acknowledgement: false }, message: error.message || "Having issue is server" })
     }
