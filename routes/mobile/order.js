@@ -595,7 +595,7 @@ router.get('/getOrdersCount', authenticateToken, async (req, res) => {
 })
 router.get('/getUserOrders', authenticateToken, async (req, res) => {
     try {
-        const { orderId } = req.query;
+        const { orderId, isComplete } = req.query;
         const userId = req.user._id;
         console.log(userId);
         let match;
@@ -611,6 +611,11 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
         if (orderId != undefined) {
             anotherMatch.push({
                 _id: mongoose.Types.ObjectId(orderId)
+            })
+        }
+        if (isComplete != undefined && isComplete === "true") {
+            anotherMatch.push({
+                status: { $nin: [0, 1] }
             })
         }
         if (anotherMatch.length > 0) {
@@ -630,12 +635,7 @@ router.get('/getUserOrders', authenticateToken, async (req, res) => {
         let getUsers = await invoiceSchema.aggregate([
             {
                 $match: {
-                    $and: [
-                        { userId: mongoose.Types.ObjectId(userId) },
-                        {
-                            status: { $nin: [0, 1] }
-                        }
-                    ]
+                    userId: mongoose.Types.ObjectId(userId)
                 }
             },
             match,
